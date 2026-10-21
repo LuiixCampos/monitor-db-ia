@@ -35,6 +35,7 @@ BEGIN
   SELECT t, 'ORACLE', o.sql_id, left(o.query, 500), o.calls, o.mean_exec_ms, o.mean_exec_ms * o.calls
   FROM monitor.oracle_lentas o
   WHERE o.atualizado_em > now() - interval '1 hour'
+    AND o.calls >= 3          -- ignora cursores de execução única (literais sem bind)
   ON CONFLICT DO NOTHING;
   GET DIAGNOSTICS n = ROW_COUNT;
   RETURN n;
@@ -54,7 +55,7 @@ BEGIN
          round((b.mean_exec_ms * (0.55 + 0.45 * (1 - k)) * (0.9 + random() * 0.2))::numeric, 2),
          NULL, 'SIMULADO'
   FROM (SELECT DISTINCT ON (banco, query_id) banco, query_id, query, calls, mean_exec_ms
-        FROM monitor.snapshots WHERE origem = 'REAL'
+        FROM monitor.snapshots WHERE origem = 'REAL' AND calls >= 3
         ORDER BY banco, query_id, coleta_em DESC) b
   CROSS JOIN LATERAL (
     SELECT g AS ts, (extract(epoch FROM now() - g) / (p_dias * 86400.0))::numeric AS k
