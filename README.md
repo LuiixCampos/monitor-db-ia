@@ -1,82 +1,90 @@
 # monitor-db-ia
 
-Laboratório de monitoramento de bancos de dados com IA: Docker + PostgreSQL + n8n + Claude, com evolução para Databricks e BI.
+Laboratório de monitoramento de bancos de dados com IA: detecta queries lentas, gera um diagnóstico
+automático, sugere a correção, comprova o ganho com benchmark e apresenta tudo em dashboards de BI.
 
-## Arquitetura (etapa 1)
+Toda a base é fictícia (varejo de moda genérico) e a IA roda localmente, sem enviar dados para fora da máquina.
+
+## O ciclo
 
 ```
-[carga] --queries de varejo--> [postgres-lab :5433] <--top queries + EXPLAIN-- [n8n :5678]
-                                        ^                                          |
-                                        |                                          v
-                                 monitor.analises_ia <------ diagnóstico ---- [ollama :11434]
+detectar  ->  diagnosticar  ->  corrigir  ->  comprovar  ->  apresentar
+pg_stat_statements   pré-análise do plano    CREATE INDEX      EXPLAIN ANALYZE     Grafana e Power BI
+V$SQL (Oracle)       + IA local (Ollama)     CONCURRENTLY      antes x depois      + alerta no Telegram
 ```
 
-Base fictícia de varejo de moda (schema `varejo`): lojas, produtos, clientes, vendas,
-itens de venda, estoque, transferências e inventários. Nenhum dado real.
-A IA roda localmente (Ollama + qwen2.5:3b), de graça e sem dados saindo da máquina.
+## Arquitetura
+
+```
+[carga] ---> [postgres-lab :5433] <--- [n8n :5678] ---> [ollama :11434]
+                   |   schema varejo      |  a cada 30 min: top queries + plano + pistas -> IA
+                   |   schema monitor     |  a cada 15 min: alerta no Telegram
+                   |   schema bi          |  a cada hora:   refresh das tabelas pré-agregadas
+                   v
+         [grafana :3000]  [Power BI Desktop]          [oracle-lab :1521]  (opcional)
+```
+
+| Componente | Papel |
+|---|---|
+| PostgreSQL 16 | Base de varejo (5 milhões de linhas), `pg_stat_statements`, schemas `monitor` e `bi` |
+| Oracle Free 23ai | Mesma ideia no Oracle, com `V$SQL` e `DBMS_XPLAN` (perfil opcional) |
+| n8n | Orquestra coleta, análise da IA, alertas e manutenção |
+| Ollama (qwen2.5:3b) | IA local e gratuita que escreve o diagnóstico |
+| Grafana | Painel operacional (queries lentas, diagnósticos, benchmark) |
+| Power BI | Relatório gerencial: vendas, performance do banco, estoque e inventário |
+
+## Resultados no lab
+
+| Consulta | Antes | Depois | Correção |
+|---|---|---|---|
+| Top 20 SKUs do mês | 235 ms | 0,04 ms | Tabela pré-agregada (materialized view) |
+| Vendas 24h por loja | 72 ms | 2,6 ms | Índice em `vendas(data_hora)` |
+| Histórico do cliente | 25 ms | 0,01 ms | Índice em `vendas(cliente_id)` |
+| Ruptura de estoque | 18 ms | 3,8 ms | Índice composto em `estoque(loja_id, qtd_disponivel)` |
+| Divergência de inventário | 14 ms | 3,5 ms | Índice em `inventario_itens(inventario_id)` |
+
+O diagnóstico da IA é guiado por uma pré-análise feita pelo próprio banco (`monitor.fn_pistas`), que lê o plano
+de execução e aponta Seq Scans em tabelas grandes e colunas de filtro e join sem índice. Isso evita que um modelo
+pequeno sugira índices inúteis.
 
 ## Como subir
 
-1. Copie `.env.example` para `.env` e troque as senhas.
+1. Copie `.env.example` para `.env` e defina as senhas (somente letras e números).
 2. Na pasta do projeto:
    ```
    docker compose up -d
-   docker compose --profile carga up -d
+   docker compose --profile carga up -d carga
+   docker exec -it ollama ollama pull qwen2.5:3b
    ```
-3. Acesse o n8n em http://localhost:5678 e crie o usuário local.
-4. Confira as queries lentas:
-   ```
-   docker exec -it postgres-lab psql -U labadmin -d lab -c "SELECT queryid, calls, mean_exec_ms, left(query,80) FROM monitor.vw_top_lentas;"
-   ```
+3. Importe os fluxos de `n8n/workflows` em http://localhost:5678 e selecione as credenciais.
+4. Grafana em http://localhost:3000. Power BI: siga `docs/powerbi/README.md`.
 
-## Credencial do Postgres no n8n
+Oracle (opcional, cerca de 2 GB de RAM):
+```
+docker compose --profile oracle up -d
+```
 
-- Host: `postgres-lab` | Porta: `5432` | Banco: `lab`
-- Usuário: `monitor_user` | Senha: a `MONITOR_PASSWORD` do `.env`
+## Estrutura
+
+```
+db/init/        scripts do PostgreSQL (base, monitoramento, pistas, benchmark, BI, realismo)
+oracle/init/    scripts do Oracle (base e monitoramento)
+scripts/        carga, aplicação e reversão de índices, pré-agregados
+n8n/workflows/  fluxos do n8n (analisador, alertas, pré-agregados)
+grafana/        datasource e dashboard provisionados
+docs/powerbi/   guia, medidas DAX, tema e fundos do relatório
+docs/           roteiro de apresentação
+```
 
 ## Roadmap
 
-- [x] Etapa 1: Postgres com pg_stat_statements, carga de queries lentas, n8n
-- [x] Etapa 2: base de varejo fictícia + fluxo n8n (top queries + EXPLAIN -> Ollama -> histórico)
-- [x] Etapa 2b: pré-análise no banco (fn_pistas) para guiar a IA
-- [x] Etapa 2c: benchmark antes/depois com EXPLAIN ANALYZE
-- [x] Etapa 2d: Top SKUs resolvido com tabela pré-agregada (materialized view + refresh pelo n8n)
-- [x] Etapa 3: dashboard no Grafana (http://localhost:3000) e fluxo de alerta no Telegram
-- [ ] Etapa 3c: opção de usar a API do Claude no lugar do Ollama
-- [ ] Etapa 3b: histórico em monitor.snapshot_queries e envio ao Databricks
-- [x] Etapa 4: camada de BI (schema `bi`, modelo estrela) + guia e medidas DAX do Power BI (docs/powerbi)
-- [ ] Etapa 5: Oracle Free e MySQL no lab
-
-## Dashboard (Grafana)
-
-http://localhost:3000 abre direto o painel "Monitor DB IA - Varejo" (visualização sem login;
-para editar, usuário `admin` e a senha `GRAFANA_PASSWORD` do `.env`).
-
-## Fluxos do n8n (pasta n8n/workflows)
-
-| Arquivo | O que faz |
-|---|---|
-| analisador-queries-ollama.json | A cada 30 min: top queries lentas + plano + pistas -> IA -> monitor.analises_ia |
-| alertas-telegram.json | A cada 15 min: envia no Telegram as análises ainda não avisadas |
-| atualizar-preagregados.json | A cada hora: REFRESH da materialized view de ranking de SKUs |
-
-## Benchmark antes/depois
-
-```
-docker compose --profile carga stop carga
-docker exec postgres-lab psql -U labadmin -d lab -c "SELECT monitor.fn_benchmark('antes');"
-docker exec postgres-lab psql -U labadmin -d lab -f /scripts/aplicar_indices.sql
-docker exec postgres-lab psql -U labadmin -d lab -c "SELECT monitor.fn_benchmark('depois');"
-docker exec postgres-lab psql -U labadmin -d lab -c "SELECT consulta, antes_ms, depois_ms, ganho_pct FROM monitor.vw_benchmark_comparativo;"
-```
-
-Top SKUs (correção por modelagem, não por índice): `docker exec postgres-lab psql -U labadmin -d lab -f /scripts/top_skus_preagregado.sql`
-
-Para repetir a demonstração: `docker exec postgres-lab psql -U labadmin -d lab -f /scripts/reverter_indices.sql`
-
-## Parar / limpar
-
-```
-docker compose --profile carga down        # para tudo
-docker compose --profile carga down -v     # para e APAGA os dados (volumes)
-```
+- [x] Base de varejo fictícia e carga simulada
+- [x] Detecção de queries lentas e pré-análise do plano no banco
+- [x] Diagnóstico com IA local (Ollama) e alerta no Telegram
+- [x] Benchmark antes/depois e correção por modelagem (pré-agregado)
+- [x] Grafana e relatório Power BI (3 páginas)
+- [x] Dados com sazonalidade e diferenças regionais
+- [x] Oracle Free no lab (base e monitoramento)
+- [ ] Fluxo do n8n para o Oracle
+- [ ] Histórico no Databricks
+- [ ] Opção de usar a API do Claude no lugar do Ollama

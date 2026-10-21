@@ -88,6 +88,43 @@ services:
       postgres-lab:
         condition: service_healthy
 
+  # Oracle Free 23ai (opcional, pesado: ~2 GB de RAM).
+  # Sobe só com: docker compose --profile oracle up -d
+  oracle-lab:
+    image: gvenzl/oracle-free:23-slim-faststart
+    container_name: oracle-lab
+    profiles: ["oracle"]
+    restart: unless-stopped
+    environment:
+      ORACLE_PASSWORD: ${ORACLE_PASSWORD}
+      APP_USER: varejo
+      APP_USER_PASSWORD: ${ORACLE_APP_PASSWORD}
+      MONITOR_PASSWORD: ${MONITOR_PASSWORD}
+      TZ: America/Sao_Paulo
+    ports:
+      - "1521:1521"
+    volumes:
+      - oracle_data:/opt/oracle/oradata
+      - ./oracle/init:/container-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 15s
+      timeout: 10s
+      retries: 40
+
+  carga-oracle:
+    image: gvenzl/oracle-free:23-slim-faststart
+    container_name: carga-oracle
+    profiles: ["oracle"]
+    environment:
+      ORACLE_APP_PASSWORD: ${ORACLE_APP_PASSWORD}
+    entrypoint: ["bash", "/scripts/carga_oracle.sh"]
+    volumes:
+      - ./scripts:/scripts:ro
+    depends_on:
+      oracle-lab:
+        condition: service_healthy
+
   # Gera queries lentas de propósito. Sobe só com: docker compose --profile carga up -d
   carga:
     image: postgres:16
@@ -110,3 +147,4 @@ volumes:
   n8n_data:
   ollama_data:
   grafana_data:
+  oracle_data:
