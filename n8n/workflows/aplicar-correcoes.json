@@ -84,7 +84,7 @@
         "resource": "issueComment",
         "operation": "add",
         "issueKey": "={{ $json.jira_key }}",
-        "comment": "={{ ($json.ok ? 'Correção aplicada automaticamente pelo monitor-db-ia.' : 'Correção NÃO aplicada.') + '\\n\\n' + '*Banco:* ' + ($json.banco || '-') + '\\n' + '*Resultado:* ' + $json.mensagem + '\\n' + ($json.comandos && $json.comandos.length ? '\\n*Comandos executados:*\\n{code:sql}\\n' + $json.comandos.join('\\n') + '\\n{code}' : '') }}",
+        "comment": "={{ ($json.ok ? 'Correção aplicada automaticamente pelo monitor-db-ia.' : 'Correção NÃO aplicada.') + '\\n\\n' + 'Banco: ' + ($json.banco || '-') + '\\n' + 'Resultado: ' + $json.mensagem + ($json.comandos && $json.comandos.length ? '\\n\\nComandos executados:\\n' + $json.comandos.join('\\n') : '') }}",
         "options": {}
       },
       "id": "df3afbf4-cc8c-4660-b48b-9a4644238fd7",
@@ -138,12 +138,11 @@
         "operation": "update",
         "issueKey": "={{ $('Aplicar correção').item.json.jira_key }}",
         "updateFields": {
-          "labels": "={{ $('Chamados aprovados').item.json.fields.labels.concat(['corrigido']) }}",
-          "statusId": ""
+          "labels": "={{ $('Chamados aprovados').item.json.fields.labels.concat(['corrigido']) }}"
         }
       },
       "id": "81e29e95-1de9-4378-b7ee-9c3b2c408938",
-      "name": "Resolver chamado",
+      "name": "Marcar como corrigido",
       "type": "n8n-nodes-base.jira",
       "typeVersion": 1,
       "position": [
@@ -170,7 +169,44 @@
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.3,
       "position": [
+        2080,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Chamados aprovados').item.json.self.split('/rest/')[0] + '/rest/api/3/issue/' + $('Aplicar correção').item.json.jira_key + '/transitions' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "jiraSoftwareCloudApi",
+        "options": {}
+      },
+      "id": "d0cda359-b1e8-4e6f-bbc3-31986c6284dc",
+      "name": "Buscar transições",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
         1560,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Chamados aprovados').item.json.self.split('/rest/')[0] + '/rest/api/3/issue/' + $('Aplicar correção').item.json.jira_key + '/transitions' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "jiraSoftwareCloudApi",
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ transition: { id: $json.transitions.find(t => t.to.statusCategory.key === 'done').id } }) }}"
+      },
+      "id": "9f648bb9-2392-4fe3-80b6-788fa531cd73",
+      "name": "Resolver chamado",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1820,
         0
       ]
     }
@@ -235,12 +271,34 @@
       "main": [
         [
           {
-            "node": "Resolver chamado",
+            "node": "Marcar como corrigido",
             "type": "main",
             "index": 0
           }
         ],
         []
+      ]
+    },
+    "Marcar como corrigido": {
+      "main": [
+        [
+          {
+            "node": "Buscar transições",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar transições": {
+      "main": [
+        [
+          {
+            "node": "Resolver chamado",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Resolver chamado": {
