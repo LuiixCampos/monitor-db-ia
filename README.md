@@ -113,7 +113,7 @@ Um modelo pequeno, sozinho, sugere índices inúteis. Aqui a IA não adivinha:
    docker compose --profile oracle up -d
    docker exec oracle-lab bash /container-entrypoint-initdb.d/02_monitor.sh
    ```
-4. Scripts que rodam em banco já existente: `db/init/04` a `13` (`docker exec postgres-lab psql -U labadmin -d lab -f /docker-entrypoint-initdb.d/<arquivo>`).
+4. Scripts que rodam em banco já existente: `db/init/04` a `14` (`docker exec postgres-lab psql -U labadmin -d lab -f /docker-entrypoint-initdb.d/<arquivo>`).
 5. Importe os fluxos de `n8n/workflows` em http://localhost:5678 e configure as credenciais.
 6. Databricks: rode `databricks/01_setup.sql` e `02_previsao.sql` e importe `painel-monitor-db.lvdash.json`.
 7. Power BI: siga `docs/powerbi/README.md`.
@@ -138,6 +138,8 @@ Um modelo pequeno, sozinho, sugere índices inúteis. Aqui a IA não adivinha:
 | ![Fila de chamados no Jira](docs/img/jira-fila.png) | ![Avisos no Slack](docs/img/slack.png) |
 | ![Previsão no Databricks](docs/img/databricks-painel.png) | ![Alerta no Telegram](docs/img/telegram.png) |
 | ![Power BI - Performance](docs/img/powerbi-performance.png) | ![Power BI - Chamados](docs/img/powerbi-chamados.png) |
+
+![Painel do Grafana](docs/img/grafana.png)
 
 ## Estrutura
 
