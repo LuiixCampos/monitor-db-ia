@@ -1,0 +1,133 @@
+{
+  "name": "Atualizar chamado",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Atualizar chamado de banco",
+        "formDescription": "Atualize o status de um chamado aberto pelo monitor-db-ia.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Número do chamado",
+              "fieldType": "text",
+              "placeholder": "DB-0001",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Status",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "EM_ANDAMENTO"
+                  },
+                  {
+                    "option": "RESOLVIDO"
+                  },
+                  {
+                    "option": "ABERTO"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Responsável",
+              "fieldType": "text",
+              "placeholder": "Seu nome"
+            },
+            {
+              "fieldLabel": "Comentário",
+              "fieldType": "textarea",
+              "placeholder": "Ex.: índice criado com CONCURRENTLY, tempo caiu de 230 ms para 2 ms"
+            }
+          ]
+        },
+        "options": {
+          "respondWithOptions": {
+            "values": {
+              "formSubmittedText": "Chamado atualizado e avisado no Slack."
+            }
+          }
+        }
+      },
+      "id": "5bbe8133-9579-4dfa-99cb-eb2f4bd23808",
+      "name": "Formulário do chamado",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        100
+      ],
+      "webhookId": "0da97d76-4ea7-4ece-af41-81d1c3e26ebf"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM monitor.fn_atualizar_chamado($1, $2, $3, $4);",
+        "options": {
+          "queryReplacement": "={{ [ $json['Número do chamado'], $json['Status'], $json['Responsável'] || '', $json['Comentário'] || '' ] }}"
+        }
+      },
+      "id": "4ab4273c-efe4-4344-877c-66b5bf935fcb",
+      "name": "Atualizar no banco",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        260,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#incidentes-db",
+          "mode": "name"
+        },
+        "text": "={{ ($json.status === 'RESOLVIDO' ? ':white_check_mark:' : ':hammer_and_wrench:') + ' *' + $json.numero + '* agora está *' + $json.status + '*' + ($json.responsavel ? ' com ' + $json.responsavel : '') + '\\n' + $json.titulo + ($json.comentario ? '\\n> ' + String($json.comentario).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;') : '') + ($json.status === 'RESOLVIDO' ? '\\nTempo até resolver: ' + $json.minutos_aberto + ' min' : '') }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "mrkdwn": true
+        }
+      },
+      "id": "848b32c2-4ce5-4ed0-a8ed-f8870b57e521",
+      "name": "Avisar no Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        520,
+        100
+      ]
+    }
+  ],
+  "connections": {
+    "Formulário do chamado": {
+      "main": [
+        [
+          {
+            "node": "Atualizar no banco",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Atualizar no banco": {
+      "main": [
+        [
+          {
+            "node": "Avisar no Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

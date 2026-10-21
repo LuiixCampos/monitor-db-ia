@@ -1,0 +1,113 @@
+{
+  "name": "Chamados no Slack",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "cc25d5f5-f31e-4bfb-9257-602b7ce1e320",
+      "name": "Executar manualmente",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "cdba0e2b-5d6f-405b-8387-ce0b820bfd12",
+      "name": "A cada 15 minutos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM monitor.fn_abrir_chamados();",
+        "options": {}
+      },
+      "id": "32aee86c-2a45-4528-b20f-554a1ecfff8a",
+      "name": "Abrir chamados",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        260,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#incidentes-db",
+          "mode": "name"
+        },
+        "text": "={{ ({ALTA: ':red_circle:', MEDIA: ':large_orange_circle:', BAIXA: ':large_yellow_circle:'})[$json.prioridade] + ' *' + $json.numero + ' | ' + $json.titulo + '*\\n' + '*Prioridade:* ' + $json.prioridade + '   *Execuções:* ' + $json.calls + '   *Status:* ABERTO\\n\\n' + '*Query:*\\n```' + String($json.query).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;') + '```\\n' + '*Diagnóstico da IA:*\\n' + String($json.analise).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;') + '\\n\\n_Para atualizar: formulário \"Atualizar chamado\" no n8n._' }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "mrkdwn": true
+        }
+      },
+      "id": "9470e351-ccb1-4098-95d2-0cf4d7cf1221",
+      "name": "Postar no Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        520,
+        100
+      ]
+    }
+  ],
+  "connections": {
+    "Executar manualmente": {
+      "main": [
+        [
+          {
+            "node": "Abrir chamados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A cada 15 minutos": {
+      "main": [
+        [
+          {
+            "node": "Abrir chamados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Abrir chamados": {
+      "main": [
+        [
+          {
+            "node": "Postar no Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}
