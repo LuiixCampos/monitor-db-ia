@@ -199,7 +199,7 @@
         "options": {},
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ transition: { id: $json.transitions.find(t => t.to.statusCategory.key === 'done').id } }) }}"
+        "jsonBody": "={{ (() => { const ts = $json.transitions; const txt = t => (t.name + ' ' + t.to.name).toLowerCase(); const ruim = t => /cancel|declin|reject|recus|won/.test(txt(t)); const t = ts.find(t => /resol|done|conclu|complet|fix/.test(txt(t)) && !ruim(t)) || ts.find(t => t.to.statusCategory.key === 'done' && !ruim(t)); return JSON.stringify({ transition: { id: t.id } }); })() }}"
       },
       "id": "9f648bb9-2392-4fe3-80b6-788fa531cd73",
       "name": "Resolver chamado",
