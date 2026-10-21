@@ -1,0 +1,131 @@
+createOrReplace
+
+	relationship rel_fato_vendas_data
+		fromColumn: 'bi fato_vendas'.data
+		toColumn: 'bi dim_data'.data
+
+	relationship rel_fato_itens_venda_data
+		fromColumn: 'bi fato_itens_venda'.data
+		toColumn: 'bi dim_data'.data
+
+	relationship rel_fato_inventario_data
+		fromColumn: 'bi fato_inventario'.data
+		toColumn: 'bi dim_data'.data
+
+	relationship rel_fato_transferencias_data
+		fromColumn: 'bi fato_transferencias'.data_solicitacao
+		toColumn: 'bi dim_data'.data
+
+	relationship rel_fato_transferencias_loja
+		fromColumn: 'bi fato_transferencias'.loja_destino
+		toColumn: 'bi dim_loja'.loja_id
+
+	ref table 'bi fato_vendas'
+
+		measure Faturamento = CALCULATE ( SUM ( 'bi fato_vendas'[valor_total] ), 'bi fato_vendas'[status] = "CONCLUIDA" )
+			formatString: "R$ #,0"
+			displayFolder: Vendas
+
+		measure 'Qtd Vendas' = CALCULATE ( COUNTROWS ( 'bi fato_vendas' ), 'bi fato_vendas'[status] = "CONCLUIDA" )
+			formatString: "#,0"
+			displayFolder: Vendas
+
+		measure 'Ticket Medio' = DIVIDE ( [Faturamento], [Qtd Vendas] )
+			formatString: "R$ #,0.00"
+			displayFolder: Vendas
+
+		measure 'Taxa Cancelamento %' = DIVIDE ( CALCULATE ( COUNTROWS ( 'bi fato_vendas' ), 'bi fato_vendas'[status] = "CANCELADA" ), COUNTROWS ( 'bi fato_vendas' ) )
+			formatString: "0.0%"
+			displayFolder: Vendas
+
+		measure 'Faturamento Mes Anterior' = CALCULATE ( [Faturamento], DATEADD ( 'bi dim_data'[data], -1, MONTH ) )
+			formatString: "R$ #,0"
+			displayFolder: Vendas
+
+		measure 'Variacao vs Mes Anterior %' = DIVIDE ( [Faturamento] - [Faturamento Mes Anterior], [Faturamento Mes Anterior] )
+			formatString: "0.0%"
+			displayFolder: Vendas
+
+	ref table 'bi fato_itens_venda'
+
+		measure 'Pecas Vendidas' = CALCULATE ( SUM ( 'bi fato_itens_venda'[quantidade] ), 'bi fato_itens_venda'[status] = "CONCLUIDA" )
+			formatString: "#,0"
+			displayFolder: Vendas
+
+		measure 'Pecas por Atendimento' = DIVIDE ( [Pecas Vendidas], [Qtd Vendas] )
+			formatString: "0.00"
+			displayFolder: Vendas
+
+		measure 'Receita Liquida Itens' = CALCULATE ( SUM ( 'bi fato_itens_venda'[valor_liquido] ), 'bi fato_itens_venda'[status] = "CONCLUIDA" )
+			formatString: "R$ #,0"
+			displayFolder: Margem
+
+		measure 'Custo Itens' = CALCULATE ( SUM ( 'bi fato_itens_venda'[custo_total] ), 'bi fato_itens_venda'[status] = "CONCLUIDA" )
+			formatString: "R$ #,0"
+			displayFolder: Margem
+
+		measure 'Margem Bruta' = [Receita Liquida Itens] - [Custo Itens]
+			formatString: "R$ #,0"
+			displayFolder: Margem
+
+		measure 'Margem Bruta %' = DIVIDE ( [Margem Bruta], [Receita Liquida Itens] )
+			formatString: "0.0%"
+			displayFolder: Margem
+
+	ref table 'bi fato_estoque'
+
+		measure 'Estoque Pecas' = SUM ( 'bi fato_estoque'[qtd_disponivel] )
+			formatString: "#,0"
+			displayFolder: Estoque
+
+		measure 'Estoque Valor Custo' = SUM ( 'bi fato_estoque'[valor_estoque_custo] )
+			formatString: "R$ #,0"
+			displayFolder: Estoque
+
+		measure 'SKUs em Ruptura' = CALCULATE ( COUNTROWS ( 'bi fato_estoque' ), 'bi fato_estoque'[em_ruptura] = TRUE () )
+			formatString: "#,0"
+			displayFolder: Estoque
+
+		measure 'Ruptura %' = DIVIDE ( [SKUs em Ruptura], COUNTROWS ( 'bi fato_estoque' ) )
+			formatString: "0.0%"
+			displayFolder: Estoque
+
+	ref table 'bi fato_transferencias'
+
+		measure 'Transferencias Em Transito' = CALCULATE ( COUNTROWS ( 'bi fato_transferencias' ), 'bi fato_transferencias'[status] = "EM_TRANSITO" )
+			formatString: "#,0"
+			displayFolder: Transferencias
+
+		measure 'Transferencias Atrasadas' = CALCULATE ( COUNTROWS ( 'bi fato_transferencias' ), 'bi fato_transferencias'[atrasada] = TRUE () )
+			formatString: "#,0"
+			displayFolder: Transferencias
+
+		measure 'Lead Time Medio (dias)' = AVERAGE ( 'bi fato_transferencias'[dias_ate_receber] )
+			formatString: "0.0"
+			displayFolder: Transferencias
+
+	ref table 'bi fato_inventario'
+
+		measure 'Itens Divergentes' = CALCULATE ( COUNTROWS ( 'bi fato_inventario' ), 'bi fato_inventario'[divergente] = TRUE () )
+			formatString: "#,0"
+			displayFolder: Inventario
+
+		measure 'Acuracidade Inventario %' = 1 - DIVIDE ( [Itens Divergentes], COUNTROWS ( 'bi fato_inventario' ) )
+			formatString: "0.0%"
+			displayFolder: Inventario
+
+		measure 'Perda Inventario (custo)' = CALCULATE ( SUM ( 'bi fato_inventario'[diferenca_valor_custo] ), 'bi fato_inventario'[diferenca] < 0 )
+			formatString: "R$ #,0"
+			displayFolder: Inventario
+
+	ref table 'bi mon_benchmark'
+
+		measure 'Ganho Medio Benchmark %' = AVERAGE ( 'bi mon_benchmark'[ganho_pct] ) / 100
+			formatString: "0.0%"
+			displayFolder: Monitoramento
+
+	ref table 'bi mon_analises_ia'
+
+		measure 'Analises IA' = COUNTROWS ( 'bi mon_analises_ia' )
+			formatString: "#,0"
+			displayFolder: Monitoramento

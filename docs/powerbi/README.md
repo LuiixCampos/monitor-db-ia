@@ -11,7 +11,14 @@ Nenhuma tabela do sistema é lida diretamente.
 4. Se aparecer aviso de criptografia/SSL, clique em **OK** para conectar sem criptografia (é um lab local)
 5. No Navegador, marque todas as views do schema **bi** e clique em **Carregar**
 
-## 2. Relacionamentos (Exibição de modelo)
+## 2. Relacionamentos e medidas (atalho: TMDL)
+
+Depois de carregar, abra a **Exibição TMDL**, cole o conteúdo de `modelo-relacoes-e-medidas.tmdl` e clique em **Aplicar**:
+ele cria os relacionamentos com a dim_data e a loja de destino das transferências, e as 24 medidas (organizadas em pastas).
+Os avisos "Cannot find name" antes de aplicar são normais (as medidas se referenciam entre si).
+Depois, exclua o relacionamento inativo fato_itens_venda[venda_id] -> fato_vendas[venda_id], se o Power BI tiver criado.
+
+### Lista completa dos relacionamentos
 
 | De (muitos) | Para (um) |
 |---|---|
