@@ -1,0 +1,113 @@
+{
+  "name": "Sincronizar status do Jira",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "18710ce1-4224-4d30-b609-7a82de1123a4",
+      "name": "Executar manualmente",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "0d642cc1-008c-4119-8de9-cf98b03f61d8",
+      "name": "A cada 15 minutos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jiraVersion": "cloud",
+        "resource": "issue",
+        "operation": "getAll",
+        "returnAll": true,
+        "options": {
+          "jql": "labels = monitor-db-ia AND updated >= -2d",
+          "fields": "status,assignee"
+        }
+      },
+      "id": "59970fb1-2046-4360-a2e1-e015fef448a0",
+      "name": "Buscar chamados no Jira",
+      "type": "n8n-nodes-base.jira",
+      "typeVersion": 1,
+      "position": [
+        260,
+        100
+      ],
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM monitor.fn_sincronizar_jira($1, $2, $3);",
+        "options": {
+          "queryReplacement": "={{ [ $json.key, $json.fields.status.statusCategory.key, ($json.fields.assignee && $json.fields.assignee.displayName) || '' ] }}"
+        }
+      },
+      "id": "bbfb92f3-58b7-416f-8682-6dcea523b155",
+      "name": "Atualizar no banco",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        520,
+        100
+      ]
+    }
+  ],
+  "connections": {
+    "Executar manualmente": {
+      "main": [
+        [
+          {
+            "node": "Buscar chamados no Jira",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A cada 15 minutos": {
+      "main": [
+        [
+          {
+            "node": "Buscar chamados no Jira",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar chamados no Jira": {
+      "main": [
+        [
+          {
+            "node": "Atualizar no banco",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

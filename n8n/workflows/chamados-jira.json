@@ -1,0 +1,182 @@
+{
+  "name": "Chamados no Jira",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "92a85d2e-aa5f-4785-b71d-d5c0f3749085",
+      "name": "Executar manualmente",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "20c10a58-9d44-4362-a662-64f7165a1319",
+      "name": "A cada 15 minutos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM monitor.fn_abrir_chamados();",
+        "options": {}
+      },
+      "id": "7ba991d9-44cf-47e5-9515-cbae78f27c47",
+      "name": "Abrir chamados",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        260,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jiraVersion": "cloud",
+        "resource": "issue",
+        "operation": "create",
+        "project": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "issueType": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "summary": "={{ '[' + $('Abrir chamados').item.json.prioridade + '] ' + $('Abrir chamados').item.json.titulo + ' (' + $('Abrir chamados').item.json.numero + ')' }}",
+        "additionalFields": {
+          "description": "={{ 'Chamado aberto automaticamente pelo monitor-db-ia (' + $('Abrir chamados').item.json.numero + ').\\n\\n' + '*Prioridade:* ' + $('Abrir chamados').item.json.prioridade + '\\n*Tempo médio:* ' + $('Abrir chamados').item.json.mean_exec_ms + ' ms\\n*Execuções:* ' + $('Abrir chamados').item.json.calls + '\\n\\n' + 'h3. Query\\n{code:sql}\\n' + $('Abrir chamados').item.json.query + '\\n{code}\\n\\n' + 'h3. Diagnóstico da IA\\n' + $('Abrir chamados').item.json.analise }}",
+          "labels": "={{ ['monitor-db-ia', 'prioridade-' + $('Abrir chamados').item.json.prioridade.toLowerCase()] }}"
+        }
+      },
+      "id": "7efc40e9-5f3a-42e8-bf4c-5a37f69b16eb",
+      "name": "Criar chamado no Jira",
+      "type": "n8n-nodes-base.jira",
+      "typeVersion": 1,
+      "position": [
+        520,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM monitor.fn_vincular_jira($1, $2, $3);",
+        "options": {
+          "queryReplacement": "={{ [ $('Abrir chamados').item.json.numero, $json.key, $json.self.split('/rest/')[0] + '/browse/' + $json.key ] }}"
+        }
+      },
+      "id": "50d79af7-8141-4621-a446-a1045de5d9c7",
+      "name": "Gravar chave do Jira",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        780,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#incidentes-db",
+          "mode": "name"
+        },
+        "text": "={{ ({ALTA: ':red_circle:', MEDIA: ':large_orange_circle:', BAIXA: ':large_yellow_circle:'})[$json.prioridade] + ' *Chamado aberto: <' + $json.jira_url + '|' + $json.jira_key + '>*  ' + $json.titulo + '\\n' + '*Prioridade:* ' + $json.prioridade + '\\n' + '*Query:* `' + String($('Abrir chamados').item.json.query.slice(0, 150)).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;') + '...`\\n' + '_Diagnóstico completo e tratamento no Jira._' }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "mrkdwn": true
+        }
+      },
+      "id": "80aefd8f-5732-4330-9e94-919a2aee71f8",
+      "name": "Avisar no Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        1040,
+        100
+      ]
+    }
+  ],
+  "connections": {
+    "Executar manualmente": {
+      "main": [
+        [
+          {
+            "node": "Abrir chamados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A cada 15 minutos": {
+      "main": [
+        [
+          {
+            "node": "Abrir chamados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Abrir chamados": {
+      "main": [
+        [
+          {
+            "node": "Criar chamado no Jira",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Criar chamado no Jira": {
+      "main": [
+        [
+          {
+            "node": "Gravar chave do Jira",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gravar chave do Jira": {
+      "main": [
+        [
+          {
+            "node": "Avisar no Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}
