@@ -59,12 +59,7 @@ LANGUAGE sql AS $fn$
             round(extract(epoch FROM now() - c.aberto_em) / 60, 1);
 $fn$;
 
--- Para o BI
-CREATE OR REPLACE VIEW bi.mon_chamados AS
-SELECT numero, titulo, prioridade, status, responsavel, aberto_em, aberto_em::date AS data, resolvido_em,
-       round(extract(epoch FROM coalesce(resolvido_em, now()) - aberto_em) / 3600, 1) AS horas_aberto
-FROM monitor.chamados;
+-- A view do BI (bi.mon_chamados) é criada no 10_jira.sql
 
 GRANT SELECT, INSERT, UPDATE ON monitor.chamados TO monitor_user;
 GRANT USAGE ON SEQUENCE monitor.chamados_seq TO monitor_user;
-GRANT SELECT ON bi.mon_chamados TO monitor_user;
