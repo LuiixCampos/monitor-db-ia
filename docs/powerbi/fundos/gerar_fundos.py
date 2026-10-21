@@ -102,23 +102,73 @@ def header(img,sub):
 def save(img,name):
     img.convert('RGB').resize((1920,1080),Image.LANCZOS).save('/tmp/claude-0/bg/'+name,optimize=True)
 
-# Página 1
+
+def ic_shirt(d,cx,cy):
+    s=S; d.polygon([(cx-8*s,cy-20*s),(cx-22*s,cy-12*s),(cx-16*s,cy-2*s),(cx-11*s,cy-5*s),(cx-11*s,cy+20*s),(cx+11*s,cy+20*s),(cx+11*s,cy-5*s),(cx+16*s,cy-2*s),(cx+22*s,cy-12*s),(cx+8*s,cy-20*s),(cx,cy-14*s)],outline=W1,width=3*s)
+def ic_x(d,cx,cy):
+    s=S; d.line([cx-12*s,cy-12*s,cx+12*s,cy+12*s],fill=W1,width=5*s); d.line([cx-12*s,cy+12*s,cx+12*s,cy-12*s],fill=W1,width=5*s)
+def ic_box(d,cx,cy):
+    s=S; d.polygon([(cx,cy-20*s),(cx+19*s,cy-10*s),(cx+19*s,cy+12*s),(cx,cy+22*s),(cx-19*s,cy+12*s),(cx-19*s,cy-10*s)],outline=W1,width=3*s)
+    d.line([(cx-19*s,cy-10*s),(cx,cy),(cx+19*s,cy-10*s)],fill=W1,width=3*s); d.line([cx,cy,cx,cy+22*s],fill=W1,width=3*s)
+def ic_alert(d,cx,cy):
+    s=S; d.polygon([(cx,cy-21*s),(cx+22*s,cy+18*s),(cx-22*s,cy+18*s)],outline=W1,width=3*s)
+    d.line([cx,cy-7*s,cx,cy+6*s],fill=W1,width=4*s); d.ellipse([cx-3*s,cy+10*s,cx+3*s,cy+16*s],fill=W1)
+def ic_check(d,cx,cy):
+    s=S; d.line([(cx-16*s,cy+1*s),(cx-5*s,cy+12*s),(cx+17*s,cy-12*s)],fill=W1,width=5*s,joint='curve')
+def ic_truck(d,cx,cy):
+    s=S; d.rectangle([cx-22*s,cy-12*s,cx+4*s,cy+8*s],outline=W1,width=3*s)
+    d.polygon([(cx+4*s,cy-4*s),(cx+15*s,cy-4*s),(cx+22*s,cy+3*s),(cx+22*s,cy+8*s),(cx+4*s,cy+8*s)],outline=W1,width=3*s)
+    for x in (-13,13): d.ellipse([cx+x*s-5*s,cy+8*s,cx+x*s+5*s,cy+18*s],fill=W1)
+def ic_clock(d,cx,cy):
+    s=S; d.ellipse([cx-19*s,cy-19*s,cx+19*s,cy+19*s],outline=W1,width=3*s)
+    d.line([cx,cy,cx,cy-11*s],fill=W1,width=3*s); d.line([cx,cy,cx+9*s,cy+5*s],fill=W1,width=3*s)
+
+def grad_card_small(img,x,y,w,h,c1,c2,icon,r=18):
+    X,Y,Wd,Hd=[int(v*S) for v in (x,y,w,h)]
+    sh=Image.new('RGBA',img.size,(0,0,0,0)); ImageDraw.Draw(sh).rounded_rectangle([X+6*S,Y+12*S,X+Wd+6*S,Y+Hd+12*S],r*S,fill=(0,0,0,130))
+    img=Image.alpha_composite(img,sh.filter(ImageFilter.GaussianBlur(16*S)))
+    card=Image.new('RGBA',(Wd,Hd)); gd=ImageDraw.Draw(card)
+    for i in range(Wd):
+        t=i/Wd; gd.line([i,0,i,Hd],fill=tuple(int(a+(b-a)*t) for a,b in zip(c1,c2))+(255,))
+    deco=Image.new('RGBA',(Wd,Hd),(0,0,0,0)); dd=ImageDraw.Draw(deco)
+    dd.ellipse([Wd-130*S,-60*S,Wd+30*S,100*S],fill=(255,255,255,30))
+    cx,cy,rad=Wd-52*S,Hd//2,30*S
+    dd.ellipse([cx-rad,cy-rad,cx+rad,cy+rad],fill=(255,255,255,45),outline=(255,255,255,150),width=2*S)
+    card=Image.alpha_composite(card,deco)
+    # ícone reduzido: desenha em camada maior e reduz
+    big=Image.new('RGBA',(120*S,120*S),(0,0,0,0)); icon(ImageDraw.Draw(big),60*S,60*S)
+    big=big.resize((96*S,96*S),Image.LANCZOS); card.alpha_composite(big,(cx-48*S,cy-48*S))
+    m=Image.new('L',(Wd,Hd),0); ImageDraw.Draw(m).rounded_rectangle([0,0,Wd-1,Hd-1],r*S,fill=255)
+    lay=Image.new('RGBA',img.size,(0,0,0,0)); lay.paste(card,(X,Y),m)
+    return Image.alpha_composite(img,lay)
+
+GR=[((16,185,129),(6,182,212)),((124,58,237),(236,72,153)),((245,158,11),(239,68,68)),((59,130,246),(6,182,212)),((236,72,153),(244,63,94)),((99,102,241),(139,92,246))]
+def six_cards(img,icons):
+    cw=(1860-5*20)/6
+    for i,ic in enumerate(icons):
+        img=grad_card_small(img,30+i*(cw+20),110,cw,140,GR[i][0],GR[i][1],ic)
+    return img
+
+# Página 1: 6 cards
 img=header(base(),'Visão geral de vendas')
-cw=(1860-3*20)/4
-cards=[((16,185,129),(6,182,212),ic_text('R$',26)),((124,58,237),(236,72,153),ic_bag),((245,158,11),(239,68,68),ic_receipt),((59,130,246),(6,182,212),ic_text('%',34))]
-for i,(c1,c2,ic) in enumerate(cards):
-    img=grad_card(img,30+i*(cw+20),110,cw,140,c1,c2,ic)
+img=six_cards(img,[ic_text('R$',26),ic_bag,ic_receipt,ic_text('%',34),ic_shirt,ic_x])
 for r in [(30,270,1210,380),(1260,270,630,380),(30,670,920,390),(970,670,920,390)]:
     img=panel(img,*r)
 save(img,'fundo-visao-geral.png')
 
-# Página 2
+# Página 2: Performance (3 cards)
 img=header(base(),'Performance do banco')
 cw=(1860-2*20)/3
-cards=[((16,185,129),(6,182,212),ic_trend),((124,58,237),(236,72,153),ic_text('IA',26)),((245,158,11),(239,68,68),ic_bolt)]
-for i,(c1,c2,ic) in enumerate(cards):
-    img=grad_card(img,30+i*(cw+20),110,cw,140,c1,c2,ic)
+for i,ic in enumerate([ic_trend,ic_text('IA',26),ic_bolt]):
+    img=grad_card(img,30+i*(cw+20),110,cw,140,GR[i][0],GR[i][1],ic)
 for r in [(30,270,1100,790),(1150,270,740,790)]:
     img=panel(img,*r)
 save(img,'fundo-performance.png')
+
+# Página 3: Estoque e inventário
+img=header(base(),'Estoque e inventário')
+img=six_cards(img,[ic_box,ic_alert,ic_text('%',34),ic_check,ic_truck,ic_clock])
+for r in [(30,270,1210,380),(1260,270,630,380),(30,670,920,390),(970,670,920,390)]:
+    img=panel(img,*r)
+save(img,'fundo-estoque.png')
 print('ok')
