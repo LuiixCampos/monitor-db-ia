@@ -1,0 +1,144 @@
+{
+  "name": "Analisador de queries lentas (Oracle)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "96c43553-8631-4586-89c0-d212fa18bb77",
+      "name": "Executar manualmente",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "5e12dd78-e193-400b-9245-2b08b6804e84",
+      "name": "A cada 30 minutos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM monitor.vw_oracle_pendentes;",
+        "options": {}
+      },
+      "id": "f8bacd47-c6a6-46cf-8946-a7393737519d",
+      "name": "Pendentes do Oracle",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        260,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://ollama:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'qwen2.5:3b', stream: false, options: { temperature: 0.1, num_ctx: 4096, num_predict: 600 }, prompt: 'Voce e um DBA Oracle senior explicando um problema de performance para outro DBA. O coletor ja fez uma pre-analise automatica do plano de execucao (secao PISTAS). Use essas pistas como verdade.\\n\\nBanco: Oracle 23ai. SQL_ID: ' + $json.sql_id + '. Tempo medio: ' + $json.mean_exec_ms + ' ms em ' + $json.calls + ' execucoes.\\n\\nQUERY:\\n' + $json.query + '\\n\\n' + $json.pistas + '\\n\\nPLANO DE EXECUCAO (DBMS_XPLAN):\\n' + $json.plano + '\\n\\nResponda em portugues do Brasil, de forma curta, em 3 partes:\\n1) Diagnostico: explique por que a query esta lenta com base nas PISTAS DO PLANO (TABLE ACCESS FULL, tabela grande, filtro sem indice).\\n2) Correcao: copie EXATAMENTE os comandos da secao CANDIDATOS A INDICE e explique em uma frase o que cada um resolve. NAO invente outros indices. Se nao houver candidatos, sugira revisar a query.\\n3) Risco: espaco em disco, impacto em INSERT/UPDATE e bloqueio; recomende criar com ONLINE em producao e coletar estatisticas com DBMS_STATS depois.' }) }}",
+        "options": {
+          "timeout": 600000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 0
+            }
+          }
+        }
+      },
+      "id": "1f333869-018a-4ee0-8912-b8105e6f0f3b",
+      "name": "Analisar com IA (Ollama)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO monitor.analises_ia (banco, sql_id, query_texto, mean_exec_ms, calls, plano, pistas, modelo, analise) VALUES ('ORACLE', $1, $2, $3, $4, $5, $6, 'qwen2.5:3b', $7);",
+        "options": {
+          "queryReplacement": "={{ [ $('Pendentes do Oracle').item.json.sql_id, $('Pendentes do Oracle').item.json.query, $('Pendentes do Oracle').item.json.mean_exec_ms, $('Pendentes do Oracle').item.json.calls, $('Pendentes do Oracle').item.json.plano, $('Pendentes do Oracle').item.json.pistas, $json.response ] }}"
+        }
+      },
+      "id": "dc39b95a-28e1-4063-89f1-f79401bb6d76",
+      "name": "Salvar análise",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        780,
+        100
+      ]
+    }
+  ],
+  "connections": {
+    "Executar manualmente": {
+      "main": [
+        [
+          {
+            "node": "Pendentes do Oracle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A cada 30 minutos": {
+      "main": [
+        [
+          {
+            "node": "Pendentes do Oracle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pendentes do Oracle": {
+      "main": [
+        [
+          {
+            "node": "Analisar com IA (Ollama)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analisar com IA (Ollama)": {
+      "main": [
+        [
+          {
+            "node": "Salvar análise",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

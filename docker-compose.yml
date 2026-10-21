@@ -125,6 +125,25 @@ services:
       oracle-lab:
         condition: service_healthy
 
+  # Leva as queries lentas do Oracle para o monitor (PostgreSQL)
+  coletor-oracle:
+    image: python:3.12-slim
+    container_name: coletor-oracle
+    profiles: ["oracle"]
+    restart: unless-stopped
+    environment:
+      MONITOR_PASSWORD: ${MONITOR_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      INTERVALO_SEG: "300"
+    command: ["bash", "-c", "pip install -q oracledb 'psycopg[binary]' && python -u /scripts/coletor_oracle.py"]
+    volumes:
+      - ./scripts:/scripts:ro
+    depends_on:
+      oracle-lab:
+        condition: service_healthy
+      postgres-lab:
+        condition: service_healthy
+
   # Gera queries lentas de propósito. Sobe só com: docker compose --profile carga up -d
   carga:
     image: postgres:16
