@@ -27,7 +27,8 @@ LANGUAGE sql AS $fn$
   RETURNING c.numero, c.status;
 $fn$;
 
-CREATE OR REPLACE VIEW bi.mon_chamados AS
+DROP VIEW IF EXISTS bi.mon_chamados;
+CREATE VIEW bi.mon_chamados AS
 SELECT numero, jira_key, jira_url, titulo, prioridade, status, responsavel, aberto_em, aberto_em::date AS data, resolvido_em,
        round(extract(epoch FROM coalesce(resolvido_em, now()) - aberto_em) / 3600, 1) AS horas_aberto
 FROM monitor.chamados;
