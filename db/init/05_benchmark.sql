@@ -18,17 +18,43 @@ CREATE TABLE IF NOT EXISTS monitor.benchmark (
   acessos      text           -- como cada tabela foi lida (Seq Scan, Index Scan...)
 );
 
-CREATE OR REPLACE FUNCTION monitor.fn_benchmark(p_fase text, p_repeticoes int DEFAULT 5) RETURNS void
+-- Mede uma consulta: 1 execução de aquecimento + N medições com EXPLAIN ANALYZE
+CREATE OR REPLACE FUNCTION monitor.fn_medir(p_fase text, p_consulta text, p_sql text, p_repeticoes int DEFAULT 5) RETURNS void
 LANGUAGE plpgsql AS $fn$
 DECLARE
-  q      record;
   i      int;
   v_txt  text;
   v_plan jsonb;
   v_ms   numeric;
-  v_tot  numeric;
+  v_tot  numeric := 0;
   v_min  numeric;
   v_max  numeric;
+BEGIN
+  EXECUTE 'EXPLAIN (ANALYZE) ' || p_sql;   -- aquecimento (cache), não conta
+  FOR i IN 1..p_repeticoes LOOP
+    EXECUTE 'EXPLAIN (ANALYZE, FORMAT JSON) ' || p_sql INTO v_txt;
+    v_plan := v_txt::jsonb;
+    v_ms   := (v_plan->0->>'Execution Time')::numeric;
+    v_tot  := v_tot + v_ms;
+    v_min  := least(coalesce(v_min, v_ms), v_ms);
+    v_max  := greatest(coalesce(v_max, v_ms), v_ms);
+  END LOOP;
+
+  INSERT INTO monitor.benchmark (fase, consulta, repeticoes, media_ms, min_ms, max_ms, usa_indice, acessos)
+  SELECT p_fase, p_consulta, p_repeticoes,
+         round(v_tot / p_repeticoes, 2), round(v_min, 2), round(v_max, 2),
+         jsonb_path_exists(v_plan, 'strict $.** ? (@."Node Type" like_regex "Index")'),
+         (SELECT string_agg(DISTINCT (x->>'Node Type') || ' em ' || (x->>'Relation Name'), '; ')
+          FROM jsonb_path_query(v_plan, 'strict $.**') x
+          WHERE jsonb_typeof(x) = 'object' AND x ? 'Relation Name');
+END
+$fn$;
+
+-- Mede as 6 consultas do sistema de varejo com parâmetros fixos
+CREATE OR REPLACE FUNCTION monitor.fn_benchmark(p_fase text, p_repeticoes int DEFAULT 5) RETURNS void
+LANGUAGE plpgsql AS $fn$
+DECLARE
+  q record;
 BEGIN
   FOR q IN
     SELECT * FROM (VALUES
@@ -46,24 +72,7 @@ BEGIN
        $q$SELECT p.sku, ii.qtd_sistema, ii.qtd_contada FROM varejo.inventario_itens ii JOIN varejo.produtos p ON p.id = ii.produto_id WHERE ii.inventario_id = 100 AND ii.qtd_contada <> ii.qtd_sistema$q$)
     ) t(nome, sql)
   LOOP
-    EXECUTE 'EXPLAIN (ANALYZE) ' || q.sql;   -- aquecimento (cache), não conta
-    v_tot := 0; v_min := NULL; v_max := NULL;
-    FOR i IN 1..p_repeticoes LOOP
-      EXECUTE 'EXPLAIN (ANALYZE, FORMAT JSON) ' || q.sql INTO v_txt;
-      v_plan := v_txt::jsonb;
-      v_ms   := (v_plan->0->>'Execution Time')::numeric;
-      v_tot  := v_tot + v_ms;
-      v_min  := least(coalesce(v_min, v_ms), v_ms);
-      v_max  := greatest(coalesce(v_max, v_ms), v_ms);
-    END LOOP;
-
-    INSERT INTO monitor.benchmark (fase, consulta, repeticoes, media_ms, min_ms, max_ms, usa_indice, acessos)
-    SELECT p_fase, q.nome, p_repeticoes,
-           round(v_tot / p_repeticoes, 2), round(v_min, 2), round(v_max, 2),
-           jsonb_path_exists(v_plan, 'strict $.** ? (@."Node Type" like_regex "Index")'),
-           (SELECT string_agg(DISTINCT (x->>'Node Type') || ' em ' || (x->>'Relation Name'), '; ')
-            FROM jsonb_path_query(v_plan, 'strict $.**') x
-            WHERE jsonb_typeof(x) = 'object' AND x ? 'Relation Name');
+    PERFORM monitor.fn_medir(p_fase, q.nome, q.sql, p_repeticoes);
   END LOOP;
 END
 $fn$;

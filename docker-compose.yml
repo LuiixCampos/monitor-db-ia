@@ -65,6 +65,29 @@ services:
               count: all
               capabilities: [gpu]
 
+  # Dashboard de BI e monitoramento (http://localhost:3000)
+  grafana:
+    image: grafana/grafana-oss:11.2.0
+    container_name: grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/dashboards/monitor-db-ia.json
+      MONITOR_PASSWORD: ${MONITOR_PASSWORD}
+      TZ: America/Sao_Paulo
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
+    depends_on:
+      postgres-lab:
+        condition: service_healthy
+
   # Gera queries lentas de propósito. Sobe só com: docker compose --profile carga up -d
   carga:
     image: postgres:16
@@ -86,3 +109,4 @@ volumes:
   pg_data:
   n8n_data:
   ollama_data:
+  grafana_data:

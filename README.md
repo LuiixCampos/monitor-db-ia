@@ -40,10 +40,25 @@ A IA roda localmente (Ollama + qwen2.5:3b), de graça e sem dados saindo da máq
 - [x] Etapa 2: base de varejo fictícia + fluxo n8n (top queries + EXPLAIN -> Ollama -> histórico)
 - [x] Etapa 2b: pré-análise no banco (fn_pistas) para guiar a IA
 - [x] Etapa 2c: benchmark antes/depois com EXPLAIN ANALYZE
-- [ ] Etapa 3: alerta no Telegram e opção de usar a API do Claude
+- [x] Etapa 2d: Top SKUs resolvido com tabela pré-agregada (materialized view + refresh pelo n8n)
+- [x] Etapa 3: dashboard no Grafana (http://localhost:3000) e fluxo de alerta no Telegram
+- [ ] Etapa 3c: opção de usar a API do Claude no lugar do Ollama
 - [ ] Etapa 3b: histórico em monitor.snapshot_queries e envio ao Databricks
 - [ ] Etapa 4: dashboard de BI (evolução de performance antes/depois)
 - [ ] Etapa 5: Oracle Free e MySQL no lab
+
+## Dashboard (Grafana)
+
+http://localhost:3000 abre direto o painel "Monitor DB IA - Varejo" (visualização sem login;
+para editar, usuário `admin` e a senha `GRAFANA_PASSWORD` do `.env`).
+
+## Fluxos do n8n (pasta n8n/workflows)
+
+| Arquivo | O que faz |
+|---|---|
+| analisador-queries-ollama.json | A cada 30 min: top queries lentas + plano + pistas -> IA -> monitor.analises_ia |
+| alertas-telegram.json | A cada 15 min: envia no Telegram as análises ainda não avisadas |
+| atualizar-preagregados.json | A cada hora: REFRESH da materialized view de ranking de SKUs |
 
 ## Benchmark antes/depois
 
@@ -54,6 +69,8 @@ docker exec postgres-lab psql -U labadmin -d lab -f /scripts/aplicar_indices.sql
 docker exec postgres-lab psql -U labadmin -d lab -c "SELECT monitor.fn_benchmark('depois');"
 docker exec postgres-lab psql -U labadmin -d lab -c "SELECT consulta, antes_ms, depois_ms, ganho_pct FROM monitor.vw_benchmark_comparativo;"
 ```
+
+Top SKUs (correção por modelagem, não por índice): `docker exec postgres-lab psql -U labadmin -d lab -f /scripts/top_skus_preagregado.sql`
 
 Para repetir a demonstração: `docker exec postgres-lab psql -U labadmin -d lab -f /scripts/reverter_indices.sql`
 

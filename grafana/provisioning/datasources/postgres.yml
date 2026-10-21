@@ -1,0 +1,15 @@
+apiVersion: 1
+datasources:
+  - name: Postgres lab
+    uid: pglab
+    type: grafana-postgresql-datasource
+    url: postgres-lab:5432
+    user: monitor_user
+    isDefault: true
+    jsonData:
+      database: lab
+      sslmode: disable
+      postgresVersion: 1600
+      timescaledb: false
+    secureJsonData:
+      password: ${MONITOR_PASSWORD}

@@ -1,0 +1,135 @@
+{
+  "name": "Alertas no Telegram",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "0213dbf6-0971-4a30-b493-6fa57152895c",
+      "name": "Executar manualmente",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "4c2b4a06-f590-44e2-8cd1-c09caf9a83e5",
+      "name": "A cada 15 minutos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT a.id, a.mean_exec_ms, a.calls,\n       left(coalesce((SELECT s.query FROM pg_stat_statements s WHERE s.queryid = a.queryid ORDER BY s.toplevel DESC LIMIT 1), '?'), 400) AS query,\n       left(a.analise, 3000) AS analise\nFROM monitor.analises_ia a\nWHERE a.notificado_em IS NULL\n  AND a.analise IS NOT NULL\nORDER BY a.mean_exec_ms DESC\nLIMIT 5;",
+        "options": {}
+      },
+      "id": "1c4749dc-83f8-4189-9338-8f8647a1b267",
+      "name": "Análises pendentes",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        260,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "COLE_AQUI_SEU_CHAT_ID",
+        "text": "={{ 'Query lenta detectada - monitor-db-ia\\n\\nTempo medio: ' + $json.mean_exec_ms + ' ms (' + $json.calls + ' execucoes)\\n\\nQuery:\\n' + $json.query + '\\n\\nAnalise da IA:\\n' + $json.analise }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "910d4418-93cc-46fe-89f4-f6b44319337b",
+      "name": "Enviar no Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        520,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE monitor.analises_ia SET notificado_em = now() WHERE id = $1;",
+        "options": {
+          "queryReplacement": "={{ $('Análises pendentes').item.json.id }}"
+        }
+      },
+      "id": "2498fe30-9b94-4700-8a38-21bb30af55a7",
+      "name": "Marcar como notificada",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        780,
+        100
+      ]
+    }
+  ],
+  "connections": {
+    "Executar manualmente": {
+      "main": [
+        [
+          {
+            "node": "Análises pendentes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A cada 15 minutos": {
+      "main": [
+        [
+          {
+            "node": "Análises pendentes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Análises pendentes": {
+      "main": [
+        [
+          {
+            "node": "Enviar no Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar no Telegram": {
+      "main": [
+        [
+          {
+            "node": "Marcar como notificada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

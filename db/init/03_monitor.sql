@@ -25,6 +25,7 @@ SELECT s.queryid,
 FROM pg_stat_statements s
 JOIN pg_database d ON d.oid = s.dbid
 WHERE d.datname = current_database()
+  AND s.toplevel                 -- ignora a query "de dentro" de um EXPLAIN ANALYZE
   AND s.query NOT ILIKE '%pg_stat_statements%'
   AND s.query NOT ILIKE '%monitor.%'
   AND s.query ILIKE 'SELECT%'      -- ignora carga inicial (INSERT, ANALYZE, DDL)
