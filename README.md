@@ -38,10 +38,24 @@ A IA roda localmente (Ollama + qwen2.5:3b), de graça e sem dados saindo da máq
 
 - [x] Etapa 1: Postgres com pg_stat_statements, carga de queries lentas, n8n
 - [x] Etapa 2: base de varejo fictícia + fluxo n8n (top queries + EXPLAIN -> Ollama -> histórico)
-- [ ] Etapa 2b: alerta no Telegram e opção de usar a API do Claude
-- [ ] Etapa 3: histórico em monitor.snapshot_queries e envio ao Databricks
+- [x] Etapa 2b: pré-análise no banco (fn_pistas) para guiar a IA
+- [x] Etapa 2c: benchmark antes/depois com EXPLAIN ANALYZE
+- [ ] Etapa 3: alerta no Telegram e opção de usar a API do Claude
+- [ ] Etapa 3b: histórico em monitor.snapshot_queries e envio ao Databricks
 - [ ] Etapa 4: dashboard de BI (evolução de performance antes/depois)
 - [ ] Etapa 5: Oracle Free e MySQL no lab
+
+## Benchmark antes/depois
+
+```
+docker compose --profile carga stop carga
+docker exec postgres-lab psql -U labadmin -d lab -c "SELECT monitor.fn_benchmark('antes');"
+docker exec postgres-lab psql -U labadmin -d lab -f /scripts/aplicar_indices.sql
+docker exec postgres-lab psql -U labadmin -d lab -c "SELECT monitor.fn_benchmark('depois');"
+docker exec postgres-lab psql -U labadmin -d lab -c "SELECT consulta, antes_ms, depois_ms, ganho_pct FROM monitor.vw_benchmark_comparativo;"
+```
+
+Para repetir a demonstração: `docker exec postgres-lab psql -U labadmin -d lab -f /scripts/reverter_indices.sql`
 
 ## Parar / limpar
 
