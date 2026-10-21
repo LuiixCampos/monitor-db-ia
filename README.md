@@ -135,9 +135,8 @@ Um modelo pequeno, sozinho, sugere índices inúteis. Aqui a IA não adivinha:
 
 | | |
 |---|---|
-| ![Jira](docs/img/jira-fila.png) | ![Correção comentada no Jira](docs/img/jira-correcao.png) |
-| ![Slack](docs/img/slack.png) | ![Telegram](docs/img/telegram.png) |
-| ![Databricks](docs/img/databricks-painel.png) | ![Grafana](docs/img/grafana.png) |
+| ![Fila de chamados no Jira](docs/img/jira-fila.png) | ![Avisos no Slack](docs/img/slack.png) |
+| ![Previsão no Databricks](docs/img/databricks-painel.png) | ![Alerta no Telegram](docs/img/telegram.png) |
 | ![Power BI - Performance](docs/img/powerbi-performance.png) | ![Power BI - Chamados](docs/img/powerbi-chamados.png) |
 
 ## Estrutura
