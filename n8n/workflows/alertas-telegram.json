@@ -50,9 +50,10 @@
     {
       "parameters": {
         "chatId": "COLE_AQUI_SEU_CHAT_ID",
-        "text": "={{ 'Query lenta detectada - monitor-db-ia\\n\\nTempo medio: ' + $json.mean_exec_ms + ' ms (' + $json.calls + ' execucoes)\\n\\nQuery:\\n' + $json.query + '\\n\\nAnalise da IA:\\n' + $json.analise }}",
+        "text": "={{ '<b>Query lenta detectada</b> - monitor-db-ia\\n\\n<b>Tempo medio:</b> ' + $json.mean_exec_ms + ' ms (' + $json.calls + ' execucoes)\\n\\n<b>Query:</b>\\n<code>' + String($json.query).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;') + '</code>\\n\\n<b>Analise da IA:</b>\\n' + String($json.analise).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;') }}",
         "additionalFields": {
-          "appendAttribution": false
+          "appendAttribution": false,
+          "parse_mode": "HTML"
         }
       },
       "id": "910d4418-93cc-46fe-89f4-f6b44319337b",
