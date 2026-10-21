@@ -1,0 +1,86 @@
+// =====================================================================
+// Medidas DAX do relatório monitor-db-ia (Power BI)
+// Crie uma tabela vazia chamada "_Medidas" (Página Inicial > Inserir dados > Carregar)
+// e cole cada medida abaixo em Ferramentas de tabela > Nova medida.
+// =====================================================================
+
+// ---------- Vendas ----------
+Faturamento =
+CALCULATE ( SUM ( fato_vendas[valor_total] ), fato_vendas[status] = "CONCLUIDA" )
+
+Qtd Vendas =
+CALCULATE ( COUNTROWS ( fato_vendas ), fato_vendas[status] = "CONCLUIDA" )
+
+Ticket Medio =
+DIVIDE ( [Faturamento], [Qtd Vendas] )
+
+Pecas Vendidas =
+CALCULATE ( SUM ( fato_itens_venda[quantidade] ), fato_itens_venda[status] = "CONCLUIDA" )
+
+Pecas por Atendimento =
+DIVIDE ( [Pecas Vendidas], [Qtd Vendas] )
+
+Taxa Cancelamento % =
+DIVIDE (
+    CALCULATE ( COUNTROWS ( fato_vendas ), fato_vendas[status] = "CANCELADA" ),
+    COUNTROWS ( fato_vendas )
+)
+
+Faturamento Mes Anterior =
+CALCULATE ( [Faturamento], DATEADD ( dim_data[data], -1, MONTH ) )
+
+Variacao vs Mes Anterior % =
+DIVIDE ( [Faturamento] - [Faturamento Mes Anterior], [Faturamento Mes Anterior] )
+
+// ---------- Margem ----------
+Receita Liquida Itens =
+CALCULATE ( SUM ( fato_itens_venda[valor_liquido] ), fato_itens_venda[status] = "CONCLUIDA" )
+
+Custo Itens =
+CALCULATE ( SUM ( fato_itens_venda[custo_total] ), fato_itens_venda[status] = "CONCLUIDA" )
+
+Margem Bruta =
+[Receita Liquida Itens] - [Custo Itens]
+
+Margem Bruta % =
+DIVIDE ( [Margem Bruta], [Receita Liquida Itens] )
+
+// ---------- Estoque ----------
+Estoque Pecas =
+SUM ( fato_estoque[qtd_disponivel] )
+
+Estoque Valor Custo =
+SUM ( fato_estoque[valor_estoque_custo] )
+
+SKUs em Ruptura =
+CALCULATE ( COUNTROWS ( fato_estoque ), fato_estoque[em_ruptura] = TRUE () )
+
+Ruptura % =
+DIVIDE ( [SKUs em Ruptura], COUNTROWS ( fato_estoque ) )
+
+// ---------- Transferências ----------
+Transferencias Em Transito =
+CALCULATE ( COUNTROWS ( fato_transferencias ), fato_transferencias[status] = "EM_TRANSITO" )
+
+Transferencias Atrasadas =
+CALCULATE ( COUNTROWS ( fato_transferencias ), fato_transferencias[atrasada] = TRUE () )
+
+Lead Time Medio (dias) =
+AVERAGE ( fato_transferencias[dias_ate_receber] )
+
+// ---------- Inventário ----------
+Itens Divergentes =
+CALCULATE ( COUNTROWS ( fato_inventario ), fato_inventario[divergente] = TRUE () )
+
+Acuracidade Inventario % =
+1 - DIVIDE ( [Itens Divergentes], COUNTROWS ( fato_inventario ) )
+
+Perda Inventario (custo) =
+CALCULATE ( SUM ( fato_inventario[diferenca_valor_custo] ), fato_inventario[diferenca] < 0 )
+
+// ---------- Monitoramento ----------
+Ganho Medio Benchmark % =
+AVERAGE ( mon_benchmark[ganho_pct] ) / 100
+
+Analises IA =
+COUNTROWS ( mon_analises_ia )

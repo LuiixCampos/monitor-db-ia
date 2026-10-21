@@ -44,7 +44,7 @@ A IA roda localmente (Ollama + qwen2.5:3b), de graça e sem dados saindo da máq
 - [x] Etapa 3: dashboard no Grafana (http://localhost:3000) e fluxo de alerta no Telegram
 - [ ] Etapa 3c: opção de usar a API do Claude no lugar do Ollama
 - [ ] Etapa 3b: histórico em monitor.snapshot_queries e envio ao Databricks
-- [ ] Etapa 4: dashboard de BI (evolução de performance antes/depois)
+- [x] Etapa 4: camada de BI (schema `bi`, modelo estrela) + guia e medidas DAX do Power BI (docs/powerbi)
 - [ ] Etapa 5: Oracle Free e MySQL no lab
 
 ## Dashboard (Grafana)
