@@ -1,0 +1,565 @@
+{
+  "datasets": [
+    {
+      "name": "ds_kpi",
+      "displayName": "KPIs",
+      "queryLines": [
+        "SELECT (SELECT count(*) FROM workspace.monitor_db.vw_previsao) AS queries_monitoradas, ",
+        "(SELECT count_if(situacao = 'JÁ ESTÁ EM ALTA') FROM workspace.monitor_db.vw_previsao) AS em_alta, ",
+        "(SELECT count_if(situacao LIKE 'ATENÇÃO%') FROM workspace.monitor_db.vw_previsao) AS atencao_30d, ",
+        "(SELECT count(*) FROM workspace.monitor_db.chamados) AS chamados, ",
+        "(SELECT count(ganho_pct) FROM workspace.monitor_db.chamados) AS corrigidos, ",
+        "(SELECT round(avg(ganho_pct), 1) FROM workspace.monitor_db.chamados) AS ganho_medio_pct"
+      ]
+    },
+    {
+      "name": "ds_diario",
+      "displayName": "Tempo médio diário",
+      "queryLines": [
+        "SELECT date_trunc('DAY', coleta_em) AS dia, banco, round(avg(mean_exec_ms), 1) AS tempo_medio_ms ",
+        "FROM workspace.monitor_db.snapshots GROUP BY ALL"
+      ]
+    },
+    {
+      "name": "ds_previsao",
+      "displayName": "Previsão",
+      "queryLines": [
+        "SELECT * FROM workspace.monitor_db.vw_previsao ORDER BY dias_ate_alta NULLS LAST, atual_ms DESC"
+      ]
+    },
+    {
+      "name": "ds_chamados",
+      "displayName": "Chamados",
+      "queryLines": [
+        "SELECT * FROM workspace.monitor_db.chamados"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "previsao",
+      "displayName": "Previsão de performance",
+      "layout": [
+        {
+          "widget": {
+            "name": "titulo",
+            "multilineTextboxSpec": {
+              "lines": [
+                "# monitor db | IA - previsão de performance\n",
+                "Histórico de tempo médio das queries (PostgreSQL e Oracle), tendência por regressão linear e efetividade das correções automáticas. ",
+                "Dias anteriores à coleta real são **simulados** (coluna origem) para demonstrar a previsão."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_queries",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_kpi",
+                  "fields": [
+                    {
+                      "name": "queries_monitoradas",
+                      "expression": "`queries_monitoradas`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "queries_monitoradas",
+                  "displayName": "Queries monitoradas"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Queries monitoradas"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 1,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_alta",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_kpi",
+                  "fields": [
+                    {
+                      "name": "em_alta",
+                      "expression": "`em_alta`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "em_alta",
+                  "displayName": "Já em prioridade ALTA"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Já em prioridade ALTA"
+              }
+            }
+          },
+          "position": {
+            "x": 1,
+            "y": 2,
+            "width": 1,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_atencao",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_kpi",
+                  "fields": [
+                    {
+                      "name": "atencao_30d",
+                      "expression": "`atencao_30d`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "atencao_30d",
+                  "displayName": "ALTA em até 30 dias"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "ALTA em até 30 dias"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 2,
+            "width": 1,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_chamados",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_kpi",
+                  "fields": [
+                    {
+                      "name": "chamados",
+                      "expression": "`chamados`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "chamados",
+                  "displayName": "Chamados abertos"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Chamados abertos"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 2,
+            "width": 1,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_corrigidos",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_kpi",
+                  "fields": [
+                    {
+                      "name": "corrigidos",
+                      "expression": "`corrigidos`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "corrigidos",
+                  "displayName": "Corrigidos automaticamente"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Corrigidos automaticamente"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 1,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_ganho",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_kpi",
+                  "fields": [
+                    {
+                      "name": "ganho_medio_pct",
+                      "expression": "`ganho_medio_pct`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "ganho_medio_pct",
+                  "displayName": "Ganho médio das correções (%)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Ganho médio das correções (%)"
+              }
+            }
+          },
+          "position": {
+            "x": 5,
+            "y": 2,
+            "width": 1,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "linha_diaria",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_diario",
+                  "fields": [
+                    {
+                      "name": "dia",
+                      "expression": "`dia`"
+                    },
+                    {
+                      "name": "banco",
+                      "expression": "`banco`"
+                    },
+                    {
+                      "name": "tempo_medio_ms",
+                      "expression": "`tempo_medio_ms`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "dia",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "displayName": "Dia"
+                },
+                "y": {
+                  "fieldName": "tempo_medio_ms",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Tempo médio (ms)"
+                },
+                "color": {
+                  "fieldName": "banco",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "Banco"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Tempo médio das queries por dia"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 4,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "barra_ganho",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_chamados",
+                  "fields": [
+                    {
+                      "name": "jira_key",
+                      "expression": "`jira_key`"
+                    },
+                    {
+                      "name": "ganho_pct",
+                      "expression": "`ganho_pct`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "jira_key",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "Chamado"
+                },
+                "y": {
+                  "fieldName": "ganho_pct",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Ganho (%)"
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Ganho de cada correção automática (%)"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 5,
+            "width": 2,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "tabela_previsao",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_previsao",
+                  "fields": [
+                    {
+                      "name": "banco",
+                      "expression": "`banco`"
+                    },
+                    {
+                      "name": "query",
+                      "expression": "`query`"
+                    },
+                    {
+                      "name": "atual_ms",
+                      "expression": "`atual_ms`"
+                    },
+                    {
+                      "name": "ms_por_dia",
+                      "expression": "`ms_por_dia`"
+                    },
+                    {
+                      "name": "confianca_r2",
+                      "expression": "`confianca_r2`"
+                    },
+                    {
+                      "name": "dias_ate_alta",
+                      "expression": "`dias_ate_alta`"
+                    },
+                    {
+                      "name": "situacao",
+                      "expression": "`situacao`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 1,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "banco",
+                    "displayName": "Banco",
+                    "title": "Banco",
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 0,
+                    "alignContent": "left",
+                    "allowSearch": true
+                  },
+                  {
+                    "fieldName": "query",
+                    "displayName": "Query",
+                    "title": "Query",
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 1,
+                    "alignContent": "left",
+                    "allowSearch": true
+                  },
+                  {
+                    "fieldName": "atual_ms",
+                    "displayName": "Atual (ms)",
+                    "title": "Atual (ms)",
+                    "type": "float",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 2,
+                    "alignContent": "right",
+                    "allowSearch": false
+                  },
+                  {
+                    "fieldName": "ms_por_dia",
+                    "displayName": "Piora por dia (ms)",
+                    "title": "Piora por dia (ms)",
+                    "type": "float",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 3,
+                    "alignContent": "right",
+                    "allowSearch": false
+                  },
+                  {
+                    "fieldName": "confianca_r2",
+                    "displayName": "Confiança (R²)",
+                    "title": "Confiança (R²)",
+                    "type": "float",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 4,
+                    "alignContent": "right",
+                    "allowSearch": false
+                  },
+                  {
+                    "fieldName": "dias_ate_alta",
+                    "displayName": "Dias até ALTA",
+                    "title": "Dias até ALTA",
+                    "type": "integer",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 5,
+                    "alignContent": "right",
+                    "allowSearch": false
+                  },
+                  {
+                    "fieldName": "situacao",
+                    "displayName": "Situação",
+                    "title": "Situação",
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 6,
+                    "alignContent": "left",
+                    "allowSearch": true
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Previsão: em quantos dias cada query passa de 150 ms"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 12,
+            "width": 6,
+            "height": 8
+          }
+        }
+      ]
+    }
+  ]
+}
