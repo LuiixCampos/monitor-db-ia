@@ -1,0 +1,197 @@
+{
+  "name": "Exportar para o Databricks",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "680c62bc-b16a-4296-bb45-2162aa15bdbf",
+      "name": "Executar manualmente",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "ac53ef6c-43e5-44b8-9b18-0f187e2514a6",
+      "name": "A cada hora",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT monitor.fn_snapshot() AS linhas;",
+        "options": {}
+      },
+      "id": "a2b05127-719e-4904-8ebc-48364d3eb7f7",
+      "name": "Tirar snapshot",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        240,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM monitor.vw_export_snapshots;",
+        "options": {}
+      },
+      "id": "da58b0be-6733-402d-8a8a-94546b51d83b",
+      "name": "Dados de snapshots",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        480,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://COLE_O_HOST/api/2.0/sql/statements",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ warehouse_id: 'COLE_O_WAREHOUSE_ID', wait_timeout: '50s', statement: \"INSERT OVERWRITE workspace.monitor_db.snapshots SELECT to_timestamp(coleta_em), banco, query_id, query, calls, mean_exec_ms, origem FROM (SELECT inline(from_json(:payload, 'array<struct<coleta_em:string,banco:string,query_id:string,query:string,calls:bigint,mean_exec_ms:double,origem:string>>')))\", parameters: [{ name: 'payload', value: $json.payload, type: 'STRING' }] }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "f5724e63-efb6-4f0e-9656-c9bfc3b3896f",
+      "name": "Enviar snapshots ao Databricks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM monitor.vw_export_chamados;",
+        "options": {}
+      },
+      "id": "1f111311-d536-4948-a53a-7b87b3d181aa",
+      "name": "Dados de chamados",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        960,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://COLE_O_HOST/api/2.0/sql/statements",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ warehouse_id: 'COLE_O_WAREHOUSE_ID', wait_timeout: '50s', statement: \"INSERT OVERWRITE workspace.monitor_db.chamados SELECT numero, jira_key, banco, prioridade, status, mean_exec_ms, to_timestamp(aberto_em), to_timestamp(resolvido_em), antes_ms, depois_ms, ganho_pct FROM (SELECT inline(from_json(:payload, 'array<struct<numero:string,jira_key:string,banco:string,prioridade:string,status:string,mean_exec_ms:double,aberto_em:string,resolvido_em:string,antes_ms:double,depois_ms:double,ganho_pct:double>>')))\", parameters: [{ name: 'payload', value: $json.payload, type: 'STRING' }] }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "96a5ddf6-27f9-4d02-a576-cda9e0cc15b9",
+      "name": "Enviar chamados ao Databricks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        100
+      ]
+    }
+  ],
+  "connections": {
+    "Executar manualmente": {
+      "main": [
+        [
+          {
+            "node": "Tirar snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A cada hora": {
+      "main": [
+        [
+          {
+            "node": "Tirar snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tirar snapshot": {
+      "main": [
+        [
+          {
+            "node": "Dados de snapshots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dados de snapshots": {
+      "main": [
+        [
+          {
+            "node": "Enviar snapshots ao Databricks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar snapshots ao Databricks": {
+      "main": [
+        [
+          {
+            "node": "Dados de chamados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dados de chamados": {
+      "main": [
+        [
+          {
+            "node": "Enviar chamados ao Databricks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}
