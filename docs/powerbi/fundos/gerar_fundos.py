@@ -172,3 +172,25 @@ for r in [(30,270,1210,380),(1260,270,630,380),(30,670,920,390),(970,670,920,390
     img=panel(img,*r)
 save(img,'fundo-estoque.png')
 print('ok')
+
+# Página 4: Chamados
+def ic_ticket(d,cx,cy):
+    s=S; d.rounded_rectangle([cx-22*s,cy-14*s,cx+22*s,cy+14*s],4*s,outline=W1,width=3*s)
+    for y in range(-10,12,5): d.ellipse([cx+6*s,cy+y*s,cx+8*s,cy+(y+2)*s],fill=W1)
+    d.line([cx-14*s,cy-4*s,cx,cy-4*s],fill=W1,width=3*s); d.line([cx-14*s,cy+4*s,cx-4*s,cy+4*s],fill=W1,width=3*s)
+def ic_inbox(d,cx,cy):
+    s=S; d.rounded_rectangle([cx-20*s,cy-16*s,cx+20*s,cy+16*s],4*s,outline=W1,width=3*s)
+    d.line([(cx-20*s,cy+2*s),(cx-8*s,cy+2*s),(cx-4*s,cy+8*s),(cx+4*s,cy+8*s),(cx+8*s,cy+2*s),(cx+20*s,cy+2*s)],fill=W1,width=3*s)
+def ic_gear(d,cx,cy):
+    s=S
+    for a in range(0,360,45):
+        import math
+        x=cx+math.cos(math.radians(a))*18*s; y=cy+math.sin(math.radians(a))*18*s
+        d.ellipse([x-5*s,y-5*s,x+5*s,y+5*s],fill=W1)
+    d.ellipse([cx-15*s,cy-15*s,cx+15*s,cy+15*s],fill=W1); d.ellipse([cx-7*s,cy-7*s,cx+7*s,cy+7*s],fill=(200,80,160,255))
+img=header(base(),'Chamados de banco')
+img=six_cards(img,[ic_ticket,ic_inbox,ic_gear,ic_check,ic_clock,ic_alert])
+for r in [(30,270,1210,380),(1260,270,630,380),(30,670,920,390),(970,670,920,390)]:
+    img=panel(img,*r)
+save(img,'fundo-chamados.png')
+print('ok4')

@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS monitor.chamados (
   numero        text GENERATED ALWAYS AS ('DB-' || lpad(id::text, 4, '0')) STORED,
   analise_id    bigint UNIQUE REFERENCES monitor.analises_ia (id) ON DELETE SET NULL,
   titulo        text,
-  prioridade    text,           -- ALTA (>= 200 ms), MEDIA (>= 50 ms), BAIXA
+  prioridade    text,           -- ALTA (>= 150 ms), MEDIA (>= 50 ms), BAIXA
   status        text DEFAULT 'ABERTO',
   responsavel   text,
   comentario    text,
@@ -27,7 +27,7 @@ LANGUAGE sql AS $fn$
     INSERT INTO monitor.chamados (analise_id, titulo, prioridade)
     SELECT a.id,
            'Query lenta: ' || round(a.mean_exec_ms) || ' ms em média',
-           CASE WHEN a.mean_exec_ms >= 200 THEN 'ALTA'
+           CASE WHEN a.mean_exec_ms >= 150 THEN 'ALTA'
                 WHEN a.mean_exec_ms >= 50  THEN 'MEDIA'
                 ELSE 'BAIXA' END
     FROM monitor.analises_ia a
