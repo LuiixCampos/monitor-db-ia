@@ -1,0 +1,144 @@
+{
+  "name": "Analisador de queries lentas (Ollama) v2",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "99cede2c-57d6-4885-9d8b-017a3b1720ec",
+      "name": "Executar manualmente",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "37c347fc-10a9-4e96-a910-358ea6151f77",
+      "name": "A cada 30 minutos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT t.queryid, t.query, t.calls, t.mean_exec_ms,\n       monitor.fn_explain(t.query) AS plano,\n       monitor.fn_pistas(t.query)  AS pistas\nFROM monitor.vw_top_lentas t\nWHERE NOT EXISTS (\n  SELECT 1 FROM monitor.analises_ia a\n  WHERE a.queryid = t.queryid\n    AND a.analisado_em > now() - interval '24 hours'\n);",
+        "options": {}
+      },
+      "id": "1ec46937-5959-4178-8ad5-72e1ebe822f4",
+      "name": "Top queries lentas",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        260,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://ollama:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'qwen2.5:3b', stream: false, options: { temperature: 0.1, num_ctx: 4096, num_predict: 600 }, prompt: 'Voce e um DBA PostgreSQL senior explicando um problema de performance para outro DBA. O banco ja fez uma pre-analise automatica do plano de execucao (secao PISTAS). Use essas pistas como verdade.\\n\\nTempo medio: ' + $json.mean_exec_ms + ' ms em ' + $json.calls + ' execucoes.\\n\\nQUERY:\\n' + $json.query + '\\n\\n' + $json.pistas + '\\n\\nPLANO DE EXECUCAO:\\n' + $json.plano + '\\n\\nResponda em portugues do Brasil, de forma curta, em 3 partes:\\n1) Diagnostico: explique por que a query esta lenta com base nas PISTAS DO PLANO (Seq Scan, tabela grande, filtro ou join sem indice).\\n2) Correcao: copie EXATAMENTE os comandos da secao CANDIDATOS A INDICE e explique em uma frase o que cada um resolve. NAO invente outros indices. Se nao houver candidatos, sugira revisar a query.\\n3) Risco: espaco em disco, impacto em INSERT/UPDATE e bloqueio durante a criacao; recomende CREATE INDEX CONCURRENTLY em producao.' }) }}",
+        "options": {
+          "timeout": 600000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 0
+            }
+          }
+        }
+      },
+      "id": "30b91022-e4e6-490c-bc76-1b1850569ce6",
+      "name": "Analisar com IA (Ollama)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO monitor.analises_ia (queryid, mean_exec_ms, calls, plano, pistas, modelo, analise) VALUES ($1, $2, $3, $4, $5, $6, $7);",
+        "options": {
+          "queryReplacement": "={{ [ $('Top queries lentas').item.json.queryid, $('Top queries lentas').item.json.mean_exec_ms, $('Top queries lentas').item.json.calls, $('Top queries lentas').item.json.plano, $('Top queries lentas').item.json.pistas, 'qwen2.5:3b', $json.response ] }}"
+        }
+      },
+      "id": "e2fdf9b6-560e-43e4-9940-2032c3633211",
+      "name": "Salvar análise",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        780,
+        100
+      ]
+    }
+  ],
+  "connections": {
+    "Executar manualmente": {
+      "main": [
+        [
+          {
+            "node": "Top queries lentas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A cada 30 minutos": {
+      "main": [
+        [
+          {
+            "node": "Top queries lentas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Top queries lentas": {
+      "main": [
+        [
+          {
+            "node": "Analisar com IA (Ollama)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analisar com IA (Ollama)": {
+      "main": [
+        [
+          {
+            "node": "Salvar análise",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

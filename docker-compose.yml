@@ -46,6 +46,24 @@ services:
       postgres-lab:
         condition: service_healthy
 
+  # IA local e gratuita. Modelos ficam salvos no volume ollama_data.
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # GPU NVIDIA (GTX 1650, 4 GB). Sem placa NVIDIA, comente o bloco deploy.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
   # Gera queries lentas de propósito. Sobe só com: docker compose --profile carga up -d
   carga:
     image: postgres:16
@@ -66,3 +84,4 @@ services:
 volumes:
   pg_data:
   n8n_data:
+  ollama_data:

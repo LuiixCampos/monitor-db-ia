@@ -5,10 +5,15 @@ Laboratório de monitoramento de bancos de dados com IA: Docker + PostgreSQL + n
 ## Arquitetura (etapa 1)
 
 ```
-[carga] --queries lentas--> [postgres-lab :5433] <--coleta pg_stat_statements-- [n8n :5678]
-                                                                                    |
-                                                         (etapa 2) Claude API --> Telegram
+[carga] --queries de varejo--> [postgres-lab :5433] <--top queries + EXPLAIN-- [n8n :5678]
+                                        ^                                          |
+                                        |                                          v
+                                 monitor.analises_ia <------ diagnóstico ---- [ollama :11434]
 ```
+
+Base fictícia de varejo de moda (schema `varejo`): lojas, produtos, clientes, vendas,
+itens de venda, estoque, transferências e inventários. Nenhum dado real.
+A IA roda localmente (Ollama + qwen2.5:3b), de graça e sem dados saindo da máquina.
 
 ## Como subir
 
@@ -32,7 +37,8 @@ Laboratório de monitoramento de bancos de dados com IA: Docker + PostgreSQL + n
 ## Roadmap
 
 - [x] Etapa 1: Postgres com pg_stat_statements, carga de queries lentas, n8n
-- [ ] Etapa 2: fluxo n8n coleta top queries + EXPLAIN, envia ao Claude, alerta no Telegram
+- [x] Etapa 2: base de varejo fictícia + fluxo n8n (top queries + EXPLAIN -> Ollama -> histórico)
+- [ ] Etapa 2b: alerta no Telegram e opção de usar a API do Claude
 - [ ] Etapa 3: histórico em monitor.snapshot_queries e envio ao Databricks
 - [ ] Etapa 4: dashboard de BI (evolução de performance antes/depois)
 - [ ] Etapa 5: Oracle Free e MySQL no lab
