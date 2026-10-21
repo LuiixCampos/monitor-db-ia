@@ -1,0 +1,68 @@
+name: monitor-db-ia
+
+services:
+  postgres-lab:
+    image: postgres:16
+    container_name: postgres-lab
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      MONITOR_PASSWORD: ${MONITOR_PASSWORD}
+      TZ: America/Sao_Paulo
+    command: >
+      postgres
+      -c shared_preload_libraries=pg_stat_statements
+      -c pg_stat_statements.track=all
+      -c track_io_timing=on
+      -c log_min_duration_statement=1000
+    ports:
+      - "5433:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    environment:
+      GENERIC_TIMEZONE: America/Sao_Paulo
+      TZ: America/Sao_Paulo
+      N8N_SECURE_COOKIE: "false"
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n/workflows:/workflows
+    depends_on:
+      postgres-lab:
+        condition: service_healthy
+
+  # Gera queries lentas de propósito. Sobe só com: docker compose --profile carga up -d
+  carga:
+    image: postgres:16
+    container_name: carga
+    profiles: ["carga"]
+    environment:
+      PGHOST: postgres-lab
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB}
+    entrypoint: ["bash", "/scripts/carga.sh"]
+    volumes:
+      - ./scripts:/scripts:ro
+    depends_on:
+      postgres-lab:
+        condition: service_healthy
+
+volumes:
+  pg_data:
+  n8n_data:
