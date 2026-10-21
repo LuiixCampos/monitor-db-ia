@@ -39,7 +39,7 @@
         "operation": "getAll",
         "returnAll": true,
         "options": {
-          "jql": "labels = monitor-db-ia AND labels = aprovado AND labels not in (corrigido) AND statusCategory != Done",
+          "jql": "labels = monitor-db-ia AND labels = aprovado AND labels not in (corrigido, revisar) AND statusCategory != Done",
           "fields": "labels,status"
         }
       },
@@ -209,6 +209,25 @@
         1820,
         0
       ]
+    },
+    {
+      "parameters": {
+        "jiraVersion": "cloud",
+        "resource": "issue",
+        "operation": "update",
+        "issueKey": "={{ $('Chamados aprovados').item.json.key }}",
+        "updateFields": {
+          "labels": "={{ $('Chamados aprovados').item.json.fields.labels.concat(['revisar']) }}"
+        }
+      },
+      "id": "b3c1f0a2-7d4e-4c1a-9a51-2f6e8d0c4b17",
+      "name": "Marcar para revisão",
+      "type": "n8n-nodes-base.jira",
+      "typeVersion": 1,
+      "position": [
+        1300,
+        220
+      ]
     }
   ],
   "connections": {
@@ -276,7 +295,13 @@
             "index": 0
           }
         ],
-        []
+        [
+          {
+            "node": "Marcar para revisão",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Marcar como corrigido": {
