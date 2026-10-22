@@ -6,7 +6,7 @@ Duração sugerida: 12 minutos. Público: gestor na NTT Data (primeiro) e, se ap
 
 ```
 docker compose up -d
-docker compose --profile carga --profile oracle up -d
+docker compose --profile carga --profile oracle --profile hml up -d
 ```
 
 - Abra as abas: Grafana (localhost:3000), n8n (localhost:5678), Jira (fila MDB), Slack (#incidentes-db),
@@ -30,12 +30,12 @@ O DBA continua decidindo; o lab faz o trabalho repetitivo e prova o resultado co
 1. **Grafana:** queries lentas do momento no PostgreSQL e no Oracle, com o diagnóstico da IA.
 2. **Telegram e Slack:** alerta recebido e chamado avisado no canal com o link.
 3. **Jira:** abra o chamado. Mostre o diagnóstico, as pistas do plano e o índice sugerido.
-4. **Ao vivo:** adicione a etiqueta `aprovado`. Em até 5 minutos (ou execute o fluxo `aplicar-correcoes`
-   no n8n), o índice é criado sem travar a tabela, o ganho é medido, o Jira recebe o comentário com
-   antes x depois e o chamado é resolvido. O Slack recebe o aviso.
+4. **Ao vivo:** adicione a etiqueta `aprovado`. O fluxo `testar-hml` cria o índice em HML, mede antes x depois
+   e comenta no Jira com o ganho e a paridade HML x PRD. Liberado, o chamado ganha `liberado-prd`.
+   Adicione `aplicar-prd` (mudança aprovada): o fluxo `aplicar-correcoes` cria o índice em PRD sem travar
+   a tabela, mede, comenta e resolve o chamado. O Slack recebe os dois avisos.
    - Enquanto espera, fale do item 5 (MDB-2: 53,8 ms para 1,6 ms, 97,1%).
-5. **Power BI:** Visão geral, Performance (ganho por correção), Chamados (fila e SLA) e Estoque
-   (o mesmo banco servindo o negócio).
+5. **Power BI:** Performance (ganho por correção) e Chamados (fila e SLA).
 6. **Databricks:** previsão. "Esta query hoje está em 214 ms e piora 1,6 ms por dia; esta outra, no
    Oracle, chega ao limite em cerca de 257 dias." Passa de reativo para preventivo.
 
@@ -50,7 +50,7 @@ O DBA continua decidindo; o lab faz o trabalho repetitivo e prova o resultado co
 
 - Base 100% fictícia; nenhum dado de cliente foi usado.
 - IA local: nenhum dado sai do ambiente.
-- Nada é aplicado sem aprovação no Jira; índices com `CONCURRENTLY` / `ONLINE`.
+- Nada é aplicado sem aprovação no Jira; tudo passa por HML antes de PRD; índices com `CONCURRENTLY` / `ONLINE`.
 - Ferramentas gratuitas ou planos free (PostgreSQL, Oracle Free, n8n, Grafana, Ollama, Jira, Slack, Databricks Free).
 
 ## 6. Próximos passos propostos (1 min)
@@ -69,5 +69,5 @@ O DBA continua decidindo; o lab faz o trabalho repetitivo e prova o resultado co
 ## Ao final
 
 ```
-docker compose --profile carga --profile oracle stop
+docker compose --profile carga --profile oracle --profile hml stop
 ```

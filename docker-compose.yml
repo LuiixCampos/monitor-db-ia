@@ -11,6 +11,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       MONITOR_PASSWORD: ${MONITOR_PASSWORD}
       TZ: America/Sao_Paulo
+      # Escala da base ampliada (16_base_ampliada.sql): 1 = ~24 mi linhas
+      PGOPTIONS: "-c lab.escala=${ESCALA_BASE:-1}"
     command: >
       postgres
       -c shared_preload_libraries=pg_stat_statements
@@ -64,6 +66,24 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+
+  # Gateway de IA: mesmo formato do Ollama; troca de provedor pelo .env (IA_PROVEDOR)
+  ia-gateway:
+    image: python:3.12-slim
+    container_name: ia-gateway
+    restart: unless-stopped
+    environment:
+      IA_PROVEDOR: ${IA_PROVEDOR:-ollama}
+      IA_FALLBACK_OLLAMA: ${IA_FALLBACK_OLLAMA:-0}
+      OLLAMA_URL: http://ollama:11434
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      CLAUDE_MODELO: ${CLAUDE_MODELO:-claude-sonnet-5-5}
+      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
+      AZURE_OPENAI_KEY: ${AZURE_OPENAI_KEY:-}
+      AZURE_OPENAI_DEPLOYMENT: ${AZURE_OPENAI_DEPLOYMENT:-}
+    command: ["python", "-u", "/scripts/ia_gateway.py"]
+    volumes:
+      - ./scripts:/scripts:ro
 
   # Dashboard de BI e monitoramento (http://localhost:3000)
   grafana:
@@ -136,8 +156,12 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       MONITOR_PASSWORD: ${MONITOR_PASSWORD}
       ORACLE_APP_PASSWORD: ${ORACLE_APP_PASSWORD:-}
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-}
       ESPERA_SEG: "120"
-    command: ["bash", "-c", "pip install -q --root-user-action=ignore oracledb 'psycopg[binary]' && python -u /scripts/executor.py"]
+      GANHO_MIN_PCT: ${GANHO_MIN_PCT:-20}
+      JANELA_PRD: ${JANELA_PRD:-}
+      TZ: America/Sao_Paulo
+    command: ["bash", "-c", "pip install -q --root-user-action=ignore oracledb 'psycopg[binary]' tzdata pymysql cryptography pymssql pymongo && python -u /scripts/executor.py"]
     volumes:
       - ./scripts:/scripts:ro
     depends_on:
@@ -181,9 +205,255 @@ services:
       postgres-lab:
         condition: service_healthy
 
+  # ---------------------------------------------------------------------
+  # Ambientes HML e DEV. O postgres-lab acima faz o papel de PRD.
+  # HML: mesma base e mesma carga de PRD; a correção é testada aqui antes.
+  #   docker compose --profile hml up -d
+  # DEV: só a base, sem coleta e sem correção automática.
+  #   docker compose --profile dev up -d
+  # ---------------------------------------------------------------------
+  postgres-hml:
+    image: postgres:16
+    container_name: postgres-hml
+    profiles: ["hml"]
+    restart: unless-stopped
+    environment: &pg_env
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      MONITOR_PASSWORD: ${MONITOR_PASSWORD}
+      TZ: America/Sao_Paulo
+      PGOPTIONS: "-c lab.escala=${ESCALA_BASE:-1}"
+    command: &pg_cmd >
+      postgres
+      -c shared_preload_libraries=pg_stat_statements
+      -c pg_stat_statements.track=all
+      -c track_io_timing=on
+    ports:
+      - "5434:5432"
+    volumes:
+      - pg_hml_data:/var/lib/postgresql/data
+      - ./db/init/01_init.sh:/docker-entrypoint-initdb.d/01_init.sh:ro
+      - ./db/init/02_varejo.sql:/docker-entrypoint-initdb.d/02_varejo.sql:ro
+      - ./db/init/08_realismo.sql:/docker-entrypoint-initdb.d/08_realismo.sql:ro
+      - ./db/init/16_base_ampliada.sql:/docker-entrypoint-initdb.d/16_base_ampliada.sql:ro
+    healthcheck: &pg_health
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Mesma carga de PRD rodando em HML (sem ela não há o que medir)
+  carga-hml:
+    image: postgres:16
+    container_name: carga-hml
+    profiles: ["hml"]
+    restart: unless-stopped
+    environment:
+      PGHOST: postgres-hml
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB}
+    entrypoint: ["bash", "/scripts/carga.sh"]
+    volumes:
+      - ./scripts:/scripts:ro
+    depends_on:
+      postgres-hml:
+        condition: service_healthy
+
+  postgres-dev:
+    image: postgres:16
+    container_name: postgres-dev
+    profiles: ["dev"]
+    restart: unless-stopped
+    environment: *pg_env
+    command: *pg_cmd
+    ports:
+      - "5435:5432"
+    volumes:
+      - pg_dev_data:/var/lib/postgresql/data
+      - ./db/init/01_init.sh:/docker-entrypoint-initdb.d/01_init.sh:ro
+      - ./db/init/02_varejo.sql:/docker-entrypoint-initdb.d/02_varejo.sql:ro
+    healthcheck: *pg_health
+
+  # ---------------------------------------------------------------------
+  # Outros sistemas da varejista fictícia, cada um no seu banco:
+  #   MySQL      -> e-commerce e APIs do app      (--profile mysql)
+  #   SQL Server -> cartão próprio e crediário    (--profile sqlserver)
+  #   MongoDB    -> catálogo e navegação do app   (--profile mongodb)
+  # O coletor-multibanco sobe junto com qualquer um deles.
+  # ---------------------------------------------------------------------
+  mysql-lab:
+    image: mysql:8.4
+    container_name: mysql-lab
+    profiles: ["mysql"]
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${POSTGRES_PASSWORD}
+      MONITOR_PASSWORD: ${MONITOR_PASSWORD}
+      TZ: America/Sao_Paulo
+    command: ["--performance-schema=ON", "--innodb-buffer-pool-size=512M"]
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./db/mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+
+  carga-mysql:
+    image: mysql:8.4
+    container_name: carga-mysql
+    profiles: ["mysql"]
+    restart: unless-stopped
+    environment:
+      MYSQL_HOST: mysql-lab
+      MYSQL_PWD: ${POSTGRES_PASSWORD}
+    entrypoint: ["bash", "/scripts/carga_mysql.sh"]
+    volumes:
+      - ./scripts:/scripts:ro
+    depends_on:
+      mysql-lab:
+        condition: service_healthy
+
+  sqlserver-lab:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sqlserver-lab
+    profiles: ["sqlserver"]
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
+      MSSQL_MEMORY_LIMIT_MB: "2048"
+      TZ: America/Sao_Paulo
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+
+  # Cria a base do cartão uma vez (o SQL Server não tem pasta de init)
+  sqlserver-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sqlserver-init
+    profiles: ["sqlserver"]
+    restart: "no"
+    environment:
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
+      MONITOR_PASSWORD: ${MONITOR_PASSWORD}
+    entrypoint: ["bash", "/sqlserver/inicializar.sh"]
+    volumes:
+      - ./db/sqlserver:/sqlserver:ro
+    depends_on:
+      sqlserver-lab:
+        condition: service_healthy
+
+  carga-sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: carga-sqlserver
+    profiles: ["sqlserver"]
+    restart: unless-stopped
+    environment:
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
+    entrypoint: ["bash", "/scripts/carga_sqlserver.sh"]
+    volumes:
+      - ./scripts:/scripts:ro
+    depends_on:
+      sqlserver-init:
+        condition: service_completed_successfully
+
+  mongo-lab:
+    image: mongo:7.0
+    container_name: mongo-lab
+    profiles: ["mongodb"]
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${POSTGRES_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${POSTGRES_PASSWORD}
+      MONITOR_PASSWORD: ${MONITOR_PASSWORD}
+      TZ: America/Sao_Paulo
+    command: ["--wiredTigerCacheSizeGB", "0.5"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+      - ./db/mongodb/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+
+  carga-mongo:
+    image: mongo:7.0
+    container_name: carga-mongo
+    profiles: ["mongodb"]
+    restart: unless-stopped
+    entrypoint: ["mongosh", "--quiet", "mongodb://${POSTGRES_USER}:${POSTGRES_PASSWORD}@mongo-lab:27017/admin", "/scripts/carga_mongo.js"]
+    volumes:
+      - ./scripts:/scripts:ro
+    depends_on:
+      mongo-lab:
+        condition: service_healthy
+
+  # Lê as queries lentas e a saúde do schema de MySQL, SQL Server e MongoDB
+  coletor-multibanco:
+    image: python:3.12-slim
+    container_name: coletor-multibanco
+    profiles: ["mysql", "sqlserver", "mongodb"]
+    restart: unless-stopped
+    environment:
+      MONITOR_PASSWORD: ${MONITOR_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      INTERVALO_SEG: "300"
+      TZ: America/Sao_Paulo
+    command: ["bash", "-c", "pip install -q --root-user-action=ignore 'psycopg[binary]' pymysql cryptography pymssql pymongo && python -u /scripts/coletor_multibanco.py"]
+    volumes:
+      - ./scripts:/scripts:ro
+    depends_on:
+      postgres-lab:
+        condition: service_healthy
+
+  # Histórico de longo prazo e previsão com TimescaleDB (alternativa ao Databricks)
+  #   docker compose --profile timescale up -d
+  timescale-lab:
+    image: timescale/timescaledb:2.17.2-pg16
+    container_name: timescale-lab
+    profiles: ["timescale"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: historico
+      LAB_DB: ${POSTGRES_DB}
+      MONITOR_PASSWORD: ${MONITOR_PASSWORD}
+      TZ: America/Sao_Paulo
+    ports:
+      - "5436:5432"
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+      - ./timescale/init:/docker-entrypoint-initdb.d:ro
+    depends_on:
+      postgres-lab:
+        condition: service_healthy
+
 volumes:
   pg_data:
   n8n_data:
   ollama_data:
   grafana_data:
   oracle_data:
+  pg_hml_data:
+  pg_dev_data:
+  mysql_data:
+  sqlserver_data:
+  mongo_data:
+  timescale_data:

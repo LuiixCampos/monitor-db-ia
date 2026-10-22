@@ -1,5 +1,5 @@
 {
-  "name": "Aplicar correções aprovadas",
+  "name": "Aplicar correções em PRD",
   "nodes": [
     {
       "parameters": {},
@@ -39,7 +39,7 @@
         "operation": "getAll",
         "returnAll": true,
         "options": {
-          "jql": "labels = monitor-db-ia AND labels = aprovado AND labels not in (corrigido, revisar) AND statusCategory != Done",
+          "jql": "labels = monitor-db-ia AND labels = liberado-prd AND labels = aplicar-prd AND labels not in (corrigido, revisar) AND statusCategory != Done",
           "fields": "labels,status"
         }
       },
@@ -84,7 +84,7 @@
         "resource": "issueComment",
         "operation": "add",
         "issueKey": "={{ $json.jira_key }}",
-        "comment": "={{ ($json.ok ? 'Correção aplicada automaticamente pelo monitor-db-ia.' : 'Correção NÃO aplicada.') + '\\n\\n' + 'Banco: ' + ($json.banco || '-') + '\\n' + 'Resultado: ' + $json.mensagem + ($json.comandos && $json.comandos.length ? '\\n\\nComandos executados:\\n' + $json.comandos.join('\\n') : '') }}",
+        "comment": "={{ ($json.ok ? 'Correção aplicada em PRD pelo monitor-db-ia (testada antes em HML).' : 'Correção NÃO aplicada em PRD.') + '\\n\\n' + 'Banco: ' + ($json.banco || '-') + '\\n' + 'Resultado: ' + $json.mensagem + ($json.comandos && $json.comandos.length ? '\\n\\nComandos executados:\\n' + $json.comandos.join('\\n') : '') }}",
         "options": {}
       },
       "id": "df3afbf4-cc8c-4660-b48b-9a4644238fd7",
@@ -92,7 +92,7 @@
       "type": "n8n-nodes-base.jira",
       "typeVersion": 1,
       "position": [
-        780,
+        880,
         100
       ]
     },
@@ -158,7 +158,7 @@
           "value": "#incidentes-db",
           "mode": "name"
         },
-        "text": "={{ ':white_check_mark: *' + $('Aplicar correção').item.json.jira_key + '* corrigido automaticamente ('+$('Aplicar correção').item.json.banco+')\\n' + $('Aplicar correção').item.json.mensagem }}",
+        "text": "={{ ':white_check_mark: *' + $('Aplicar correção').item.json.jira_key + '* aplicado em PRD ('+$('Aplicar correção').item.json.banco+')\\n' + $('Aplicar correção').item.json.mensagem }}",
         "otherOptions": {
           "includeLinkToWorkflow": false,
           "mrkdwn": true
@@ -228,6 +228,41 @@
         1300,
         220
       ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f9330042-b798-46b4-9af9-b8b33101e848",
+              "leftValue": "={{ $json.adiado === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "e5982570-00a0-4f78-bfd5-5b9cdc0f41c4",
+      "name": "Dentro da janela?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        650,
+        100
+      ]
     }
   ],
   "connections": {
@@ -268,7 +303,7 @@
       "main": [
         [
           {
-            "node": "Comentar no Jira",
+            "node": "Dentro da janela?",
             "type": "main",
             "index": 0
           }
@@ -331,6 +366,17 @@
         [
           {
             "node": "Avisar no Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dentro da janela?": {
+      "main": [
+        [
+          {
+            "node": "Comentar no Jira",
             "type": "main",
             "index": 0
           }

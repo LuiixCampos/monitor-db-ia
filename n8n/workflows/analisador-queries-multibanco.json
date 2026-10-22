@@ -1,0 +1,144 @@
+{
+  "name": "Analisador de queries lentas (MySQL, SQL Server e MongoDB)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "f971f821-55d3-4035-a5e4-d28cf253b03e",
+      "name": "Executar manualmente",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "113aa107-e21b-48f5-987a-5869f1eb59e8",
+      "name": "A cada 30 minutos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM monitor.vw_lentas_pendentes;",
+        "options": {}
+      },
+      "id": "8010f3f6-c03f-4412-8741-bbace2e8151d",
+      "name": "Pendentes multibanco",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        260,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://ia-gateway:8080/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ (() => { const B = { MYSQL: { nome: 'MySQL 8.4', plano: 'EXPLAIN FORMAT=TREE', leitura: 'access_type ALL (leitura completa)', online: 'ALGORITHM=INPLACE, LOCK=NONE e ANALYZE TABLE depois' }, SQLSERVER: { nome: 'SQL Server 2022', plano: 'plano de execucao (resumo do showplan)', leitura: 'Clustered Index Scan / Table Scan e o indice pedido pelo proprio otimizador (MissingIndex)', online: 'WITH (ONLINE = ON) e UPDATE STATISTICS depois' }, MONGODB: { nome: 'MongoDB 7', plano: 'planSummary do profiler', leitura: 'COLLSCAN (colecao lida inteira)', online: 'createIndex (o build nao bloqueia a colecao no MongoDB 4.2+)' } }[$json.banco]; return JSON.stringify({ model: 'qwen2.5:3b', stream: false, options: { temperature: 0.1, num_ctx: 4096, num_predict: 600 }, prompt: 'Voce e um DBA ' + B.nome + ' senior explicando um problema de performance para outro DBA. O coletor ja fez uma pre-analise automatica do plano (secao PISTAS). Use essas pistas como verdade.\\n\\nBanco: ' + B.nome + '. Tempo medio: ' + $json.mean_exec_ms + ' ms em ' + $json.calls + ' execucoes.\\n\\nQUERY:\\n' + $json.query + '\\n\\n' + $json.pistas + '\\n\\nPLANO (' + B.plano + '):\\n' + String($json.plano).slice(0, 2500) + '\\n\\nResponda em portugues do Brasil, de forma curta, em 3 partes:\\n1) Diagnostico: explique por que a query esta lenta com base nas PISTAS DO PLANO (' + B.leitura + ', tabela grande, filtro sem indice).\\n2) Correcao: copie EXATAMENTE os comandos da secao CANDIDATOS A INDICE e explique em uma frase o que cada um resolve. NAO invente outros indices. Se nao houver candidatos, sugira revisar a query.\\n3) Risco: espaco em disco, impacto em escrita e bloqueio; recomende ' + B.online + ' em producao.' }); })() }}",
+        "options": {
+          "timeout": 600000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 0
+            }
+          }
+        }
+      },
+      "id": "76cae40e-fdc7-4ddd-9235-e45d846ae3eb",
+      "name": "Analisar com IA (Ollama)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO monitor.analises_ia (banco, ambiente, sql_id, query_texto, mean_exec_ms, calls, plano, pistas, modelo, analise) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $10, $9);",
+        "options": {
+          "queryReplacement": "={{ [ $('Pendentes multibanco').item.json.banco, $('Pendentes multibanco').item.json.ambiente, $('Pendentes multibanco').item.json.query_id, $('Pendentes multibanco').item.json.query, $('Pendentes multibanco').item.json.mean_exec_ms, $('Pendentes multibanco').item.json.calls, $('Pendentes multibanco').item.json.plano, $('Pendentes multibanco').item.json.pistas, $json.response, $json.model || 'qwen2.5:3b' ] }}"
+        }
+      },
+      "id": "f769757d-a34f-4abe-ba3a-cd6821fe2ea8",
+      "name": "Salvar análise",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        780,
+        100
+      ]
+    }
+  ],
+  "connections": {
+    "Executar manualmente": {
+      "main": [
+        [
+          {
+            "node": "Pendentes multibanco",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A cada 30 minutos": {
+      "main": [
+        [
+          {
+            "node": "Pendentes multibanco",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analisar com IA (Ollama)": {
+      "main": [
+        [
+          {
+            "node": "Salvar análise",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pendentes multibanco": {
+      "main": [
+        [
+          {
+            "node": "Analisar com IA (Ollama)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

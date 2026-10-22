@@ -1,0 +1,13 @@
+# Ajustes para rodar o lab numa VM da Azure (sem GPU).
+# Usado pelo cloud-init de deploy/azure; à mão:
+#   docker compose -f docker-compose.yml -f docker-compose.azure.yml --profile carga --profile hml up -d
+services:
+  # Sem GPU o Ollama fica lento: na nuvem a IA padrão é o Claude (ou o Azure OpenAI).
+  # Para usar o Ollama mesmo assim (só CPU), suba com --profile ollama-local.
+  ollama:
+    deploy: !reset {}
+    profiles: ["ollama-local"]
+
+  ia-gateway:
+    environment:
+      IA_PROVEDOR: ${IA_PROVEDOR:-claude}

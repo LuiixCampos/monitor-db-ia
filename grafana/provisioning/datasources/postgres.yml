@@ -13,3 +13,16 @@ datasources:
       timescaledb: false
     secureJsonData:
       password: ${MONITOR_PASSWORD}
+  # TimescaleDB (opcional: docker compose --profile timescale up -d)
+  - name: Timescale lab
+    uid: tslab
+    type: grafana-postgresql-datasource
+    url: timescale-lab:5432
+    user: grafana_ts
+    jsonData:
+      database: historico
+      sslmode: disable
+      postgresVersion: 1600
+      timescaledb: true
+    secureJsonData:
+      password: ${MONITOR_PASSWORD}

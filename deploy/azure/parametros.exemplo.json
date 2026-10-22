@@ -1,0 +1,17 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "chaveSsh":        { "value": "ssh-ed25519 AAAA... cole aqui o conteúdo do seu .pub" },
+    "meuIp":           { "value": "200.100.50.25" },
+    "senhaLab":        { "value": "TroqueEstaSenha1" },
+    "senhaMonitor":    { "value": "TroqueMonitor1" },
+    "senhaSqlServer":  { "value": "TroqueSql2026" },
+    "chaveN8n":        { "value": "troque-por-um-texto-longo-aleatorio" },
+    "iaProvedor":      { "value": "claude" },
+    "anthropicApiKey": { "value": "sk-ant-..." },
+    "perfis":          { "value": "--profile carga --profile hml" },
+    "tamanhoVm":       { "value": "Standard_D4s_v5" },
+    "desligarAs":      { "value": "2200" }
+  }
+}

@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS monitor.correcoes (
   aplicado_em timestamptz DEFAULT now()
 );
 
-CREATE OR REPLACE VIEW bi.mon_correcoes AS
+DROP VIEW IF EXISTS bi.mon_correcoes;   -- o 15_ambientes.sql recria com mais colunas
+CREATE VIEW bi.mon_correcoes AS
 SELECT jira_key, banco, comandos, antes_ms, depois_ms, ganho_pct, resultado, aplicado_em, aplicado_em::date AS data
 FROM monitor.correcoes;
 

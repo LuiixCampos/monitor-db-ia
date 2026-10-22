@@ -50,7 +50,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://ollama:11434/api/generate",
+        "url": "http://ia-gateway:8080/api/generate",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ model: 'qwen2.5:3b', stream: false, options: { temperature: 0.1, num_ctx: 4096, num_predict: 600 }, prompt: 'Voce e um DBA Oracle senior explicando um problema de performance para outro DBA. O coletor ja fez uma pre-analise automatica do plano de execucao (secao PISTAS). Use essas pistas como verdade.\\n\\nBanco: Oracle 23ai. SQL_ID: ' + $json.sql_id + '. Tempo medio: ' + $json.mean_exec_ms + ' ms em ' + $json.calls + ' execucoes.\\n\\nQUERY:\\n' + $json.query + '\\n\\n' + $json.pistas + '\\n\\nPLANO DE EXECUCAO (DBMS_XPLAN):\\n' + $json.plano + '\\n\\nResponda em portugues do Brasil, de forma curta, em 3 partes:\\n1) Diagnostico: explique por que a query esta lenta com base nas PISTAS DO PLANO (TABLE ACCESS FULL, tabela grande, filtro sem indice).\\n2) Correcao: copie EXATAMENTE os comandos da secao CANDIDATOS A INDICE e explique em uma frase o que cada um resolve. NAO invente outros indices. Se nao houver candidatos, sugira revisar a query.\\n3) Risco: espaco em disco, impacto em INSERT/UPDATE e bloqueio; recomende criar com ONLINE em producao e coletar estatisticas com DBMS_STATS depois.' }) }}",
@@ -76,9 +76,9 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO monitor.analises_ia (banco, sql_id, query_texto, mean_exec_ms, calls, plano, pistas, modelo, analise) VALUES ('ORACLE', $1, $2, $3, $4, $5, $6, 'qwen2.5:3b', $7);",
+        "query": "INSERT INTO monitor.analises_ia (banco, sql_id, query_texto, mean_exec_ms, calls, plano, pistas, modelo, analise) VALUES ('ORACLE', $1, $2, $3, $4, $5, $6, $8, $7);",
         "options": {
-          "queryReplacement": "={{ [ $('Pendentes do Oracle').item.json.sql_id, $('Pendentes do Oracle').item.json.query, $('Pendentes do Oracle').item.json.mean_exec_ms, $('Pendentes do Oracle').item.json.calls, $('Pendentes do Oracle').item.json.plano, $('Pendentes do Oracle').item.json.pistas, $json.response ] }}"
+          "queryReplacement": "={{ [ $('Pendentes do Oracle').item.json.sql_id, $('Pendentes do Oracle').item.json.query, $('Pendentes do Oracle').item.json.mean_exec_ms, $('Pendentes do Oracle').item.json.calls, $('Pendentes do Oracle').item.json.plano, $('Pendentes do Oracle').item.json.pistas, $json.response, $json.model || 'qwen2.5:3b' ] }}"
         }
       },
       "id": "dc39b95a-28e1-4063-89f1-f79401bb6d76",

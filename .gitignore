@@ -4,3 +4,4 @@ __pycache__/
 .vscode/
 *.pbix
 n8n/workflows/local/
+deploy/azure/parametros.json

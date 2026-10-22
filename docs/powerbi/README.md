@@ -44,15 +44,18 @@ Marque `dim_data` como tabela de datas (botão direito > Marcar como tabela de d
 
 Cole as medidas de `medidas.dax`.
 
-## 4. Páginas sugeridas
+## 4. Páginas
+
+O relatório ficou focado no monitoramento do banco. As views de negócio (`fato_*`, `dim_*`) continuam no schema
+`bi` para quem quiser montar páginas de vendas ou estoque.
 
 | Página | Visuais |
 |---|---|
-| **Visão geral** | Cartões: Faturamento, Qtd Vendas, Ticket Medio, Margem Bruta %. Linha: Faturamento por dim_data[data]. Rosca: Faturamento por dim_loja[regiao]. Barras: Faturamento por fato_vendas[canal]. |
-| **Produtos** | Barras: top 10 dim_produto[sku] por Pecas Vendidas. Matriz: departamento > categoria com Faturamento e Margem Bruta %. Segmentação: colecao. |
-| **Lojas** | Mapa ou barras: Faturamento por dim_loja[cidade]. Tabela: loja, Faturamento, Ticket Medio, Pecas por Atendimento. Segmentação: regiao, tipo. |
-| **Estoque e inventário** | Cartões: Estoque Valor Custo, Ruptura %, Acuracidade Inventario %, Transferencias Atrasadas. Barras: SKUs em Ruptura por loja. Tabela: Perda Inventario (custo) por loja. |
 | **Performance do banco** | Barras agrupadas: mon_benchmark antes_ms x depois_ms por consulta. Cartão: Ganho Medio Benchmark %. Tabela: mon_analises_ia (analisado_em, mean_exec_ms, analise). |
+| **Chamados** | Fila do Jira (mon_chamados), prioridade, status e horas em aberto. Ganho das correções (mon_correcoes). |
+| **Bancos e saúde do schema** (sugerida) | Tabela: mon_lentas (banco, query, mean_exec_ms). Tabela: mon_saude_schema (banco, tipo, objeto, tamanho_mb). Cartões: chamados e ganho médio de mon_efetividade. |
+| **Previsão** (sugerida) | Tabela: mon_previsao (banco, situacao, atual_ms, dias_ate_alta), ordenada por dias_ate_alta. |
+| **Esteira HML -> PRD** (sugerida) | Tabela: mon_esteira (jira_key, etapa, hml_ganho_pct, prd_ganho_pct, paridade). Segmentação: mon_correcoes[ambiente]. |
 
 ## Observação
 

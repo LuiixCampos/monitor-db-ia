@@ -1,0 +1,158 @@
+{
+  "uid": "monitor-db-ia-timescale",
+  "title": "Monitor DB IA - Histórico (TimescaleDB)",
+  "tags": [
+    "timescaledb",
+    "previsao"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "5m",
+  "time": {
+    "from": "now-90d",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Tempo médio diário por query (agregado contínuo)",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tslab"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tslab"
+          },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "time_series",
+          "rawSql": "SELECT dia AS time, banco || ' ' || left(query, 40) AS metric, media_ms AS value FROM monitor.snapshots_diario WHERE $__timeFilter(dia) ORDER BY 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "lineWidth": 1
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "table",
+          "placement": "right"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": "table",
+      "title": "Previsão sobre a série diária",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tslab"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tslab"
+          },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "table",
+          "rawSql": "SELECT banco AS \"Banco\", dias AS \"Dias de histórico\", atual_ms AS \"Hoje (ms)\", ms_por_dia AS \"ms/dia\", dias_ate_alta AS \"Dias até ALTA\", confianca_r2 AS \"R²\", query AS \"Query\" FROM monitor.vw_previsao ORDER BY dias_ate_alta NULLS LAST"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "cellOptions": {
+              "type": "auto",
+              "wrapText": true
+            },
+            "inspect": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 3,
+      "type": "table",
+      "title": "Compressão das partições (chunks)",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tslab"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 24,
+        "h": 7
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tslab"
+          },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "table",
+          "rawSql": "SELECT chunk_name AS \"Partição\", range_start AS \"De\", range_end AS \"Até\", is_compressed AS \"Comprimida\" FROM timescaledb_information.chunks WHERE hypertable_name = 'snapshots' ORDER BY range_start DESC"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "cellOptions": {
+              "type": "auto",
+              "wrapText": true
+            },
+            "inspect": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    }
+  ]
+}

@@ -8,7 +8,7 @@
   ],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 2,
+  "version": 3,
   "editable": true,
   "refresh": "1m",
   "time": {
@@ -612,6 +612,280 @@
       ],
       "fieldConfig": {
         "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 20,
+      "type": "row",
+      "title": "Multibanco, esteira HML -> PRD e previsão",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 46,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 21,
+      "type": "table",
+      "title": "Queries lentas em todos os bancos (última hora)",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "pglab"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 47,
+        "w": 24,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "pglab"
+          },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "table",
+          "rawSql": "SELECT \"Banco\", \"Tempo médio (ms)\", \"Execuções\", \"Query\" FROM ( SELECT monitor.fn_nome_banco(banco) AS \"Banco\", round(mean_exec_ms) AS \"Tempo médio (ms)\", calls AS \"Execuções\", query AS \"Query\" FROM bi.mon_lentas WHERE atualizado_em > now() - interval '1 hour' UNION ALL SELECT 'PostgreSQL', round(mean_exec_ms), calls, left(query, 300) FROM monitor.vw_top_lentas) t ORDER BY 2 DESC"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "cellOptions": {
+              "type": "auto",
+              "wrapText": true
+            },
+            "inspect": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 22,
+      "type": "table",
+      "title": "Esteira das correções: teste em HML -> aplicação em PRD",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "pglab"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 56,
+        "w": 14,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "pglab"
+          },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "table",
+          "rawSql": "SELECT jira_key AS \"Chamado\", monitor.fn_nome_banco(banco) AS \"Banco\", etapa AS \"Etapa\", hml_ganho_pct AS \"Ganho HML %\", prd_ganho_pct AS \"Ganho PRD %\", paridade AS \"Paridade HML x PRD\" FROM monitor.vw_esteira ORDER BY coalesce(prd_aplicado_em, hml_testado_em) DESC NULLS LAST"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "cellOptions": {
+              "type": "auto",
+              "wrapText": true
+            },
+            "inspect": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 23,
+      "type": "table",
+      "title": "Efetividade por banco",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "pglab"
+      },
+      "gridPos": {
+        "x": 14,
+        "y": 56,
+        "w": 10,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "pglab"
+          },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "table",
+          "rawSql": "SELECT banco AS \"Banco\", chamados AS \"Chamados\", corrigidos_automaticamente AS \"Corrigidos\", ganho_medio_pct AS \"Ganho médio %\", horas_medias_ate_resolver AS \"Horas até resolver\" FROM monitor.vw_efetividade ORDER BY chamados DESC"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "cellOptions": {
+              "type": "auto",
+              "wrapText": true
+            },
+            "inspect": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 24,
+      "type": "table",
+      "title": "Previsão: quando cada query passa de 150 ms",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "pglab"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 64,
+        "w": 14,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "pglab"
+          },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "table",
+          "rawSql": "SELECT monitor.fn_nome_banco(banco) AS \"Banco\", situacao AS \"Situação\", atual_ms AS \"Hoje (ms)\", ms_por_dia AS \"ms/dia\", dias_ate_alta AS \"Dias até ALTA\", confianca_r2 AS \"R²\", query AS \"Query\" FROM monitor.vw_previsao ORDER BY dias_ate_alta NULLS LAST, atual_ms DESC"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "cellOptions": {
+              "type": "auto",
+              "wrapText": true
+            },
+            "inspect": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 25,
+      "type": "timeseries",
+      "title": "Tempo médio diário por banco (ms)",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "pglab"
+      },
+      "gridPos": {
+        "x": 14,
+        "y": 64,
+        "w": 10,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "pglab"
+          },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "time_series",
+          "rawSql": "SELECT dia AS time, monitor.fn_nome_banco(banco) AS metric, tempo_medio_ms AS value FROM monitor.vw_tempo_diario WHERE $__timeFilter(dia) ORDER BY 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 5
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 26,
+      "type": "table",
+      "title": "Saúde do schema: índices sem uso, duplicados, tabelas sem PK e maiores tabelas",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "pglab"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 74,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "pglab"
+          },
+          "editorMode": "code",
+          "rawQuery": true,
+          "format": "table",
+          "rawSql": "SELECT monitor.fn_nome_banco(banco) AS \"Banco\", tipo AS \"Achado\", objeto AS \"Objeto\", detalhe AS \"Detalhe\", tamanho_mb AS \"MB\", coletado_em AS \"Coletado em\" FROM bi.mon_saude_schema ORDER BY CASE tipo WHEN 'INDICE_DUPLICADO' THEN 1 WHEN 'SEM_PK' THEN 2 WHEN 'INDICE_SEM_USO' THEN 3 ELSE 4 END, banco, tamanho_mb DESC NULLS LAST"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "cellOptions": {
+              "type": "auto",
+              "wrapText": true
+            },
+            "inspect": true
+          }
+        },
         "overrides": []
       },
       "options": {

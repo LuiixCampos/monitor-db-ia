@@ -35,7 +35,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT a.id, a.mean_exec_ms, a.calls,\n       left(coalesce((SELECT s.query FROM pg_stat_statements s WHERE s.queryid = a.queryid ORDER BY s.toplevel DESC LIMIT 1), '?'), 400) AS query,\n       left(a.analise, 3000) AS analise\nFROM monitor.analises_ia a\nWHERE a.notificado_em IS NULL\n  AND a.analise IS NOT NULL\nORDER BY a.mean_exec_ms DESC\nLIMIT 5;",
+        "query": "SELECT a.id, a.mean_exec_ms, a.calls,\n       coalesce(a.ambiente, 'PRD') || ' ' || monitor.fn_nome_banco(a.banco) AS banco,\n       left(coalesce(a.query_texto, (SELECT s.query FROM pg_stat_statements s WHERE s.queryid = a.queryid ORDER BY s.toplevel DESC LIMIT 1), '?'), 400) AS query,\n       left(a.analise, 3000) AS analise\nFROM monitor.analises_ia a\nWHERE a.notificado_em IS NULL\n  AND a.analise IS NOT NULL\nORDER BY a.mean_exec_ms DESC\nLIMIT 5;",
         "options": {}
       },
       "id": "1c4749dc-83f8-4189-9338-8f8647a1b267",
@@ -50,7 +50,7 @@
     {
       "parameters": {
         "chatId": "COLE_AQUI_SEU_CHAT_ID",
-        "text": "={{ '<b>Query lenta detectada</b> - monitor-db-ia\\n\\n<b>Tempo medio:</b> ' + $json.mean_exec_ms + ' ms (' + $json.calls + ' execucoes)\\n\\n<b>Query:</b>\\n<code>' + String($json.query).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;') + '</code>\\n\\n<b>Analise da IA:</b>\\n' + String($json.analise).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;') }}",
+        "text": "={{ '<b>Query lenta detectada</b> - monitor-db-ia\\n\\n<b>Banco:</b> ' + $json.banco + '\\n<b>Tempo medio:</b> ' + $json.mean_exec_ms + ' ms (' + $json.calls + ' execucoes)\\n\\n<b>Query:</b>\\n<code>' + String($json.query).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;') + '</code>\\n\\n<b>Analise da IA:</b>\\n' + String($json.analise).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;') }}",
         "additionalFields": {
           "appendAttribution": false,
           "parse_mode": "HTML"

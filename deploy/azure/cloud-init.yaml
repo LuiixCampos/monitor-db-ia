@@ -1,0 +1,40 @@
+#cloud-config
+# Preparado pelo main.bicep: instala o Docker, monta o disco de dados,
+# baixa o projeto do GitHub, grava o .env e sobe o lab.
+package_update: true
+packages: [ca-certificates, curl, git, jq]
+
+write_files:
+  - path: /opt/lab.env
+    permissions: "0600"
+    encoding: b64
+    content: __ENV_B64__
+  - path: /opt/subir-lab.sh
+    permissions: "0755"
+    content: |
+      #!/bin/bash
+      set -euo pipefail
+      exec > >(tee -a /var/log/subir-lab.log) 2>&1
+      # Disco de dados (LUN 0) em /dados, com o Docker guardando tudo nele
+      DISCO=$(ls /dev/disk/azure/data/by-lun/0 /dev/disk/azure/scsi1/lun0 2>/dev/null | head -1 || true)
+      if [ -n "$DISCO" ] && ! mountpoint -q /dados; then
+        DISCO=$(readlink -f "$DISCO")
+        blkid "$DISCO" > /dev/null || mkfs.ext4 -F -L dados "$DISCO"
+        mkdir -p /dados
+        grep -q "LABEL=dados" /etc/fstab || echo "LABEL=dados /dados ext4 defaults,nofail 0 2" >> /etc/fstab
+        mount -a
+      fi
+      mkdir -p /etc/docker /dados/docker
+      echo '{"data-root": "/dados/docker"}' > /etc/docker/daemon.json
+      command -v docker > /dev/null || curl -fsSL https://get.docker.com | sh
+      usermod -aG docker __USUARIO__
+      systemctl enable --now docker
+      [ -d /opt/monitor-db-ia/.git ] || git clone __REPO__ /opt/monitor-db-ia
+      cp /opt/lab.env /opt/monitor-db-ia/.env
+      chown -R __USUARIO__:__USUARIO__ /opt/monitor-db-ia
+      cd /opt/monitor-db-ia
+      docker compose -f docker-compose.yml -f docker-compose.azure.yml __PERFIS__ up -d
+      echo "Lab no ar."
+
+runcmd:
+  - [bash, /opt/subir-lab.sh]

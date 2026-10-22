@@ -2,6 +2,8 @@
 # Simula o uso de um sistema de varejo: dashboards, consultas de loja,
 # estoque, transferências e inventário. Várias queries sem índice de propósito.
 echo "Iniciando carga de varejo..."
+AMPLIADA=$(psql -Atc "SELECT (to_regclass('fiscal.notas') IS NOT NULL)::int" 2>/dev/null || echo 0)
+echo "Base ampliada: $AMPLIADA" 
 while true; do
   LOJA=$(( RANDOM % 197 + 4 ))
   CLI=$(( (RANDOM * 32768 + RANDOM) % 200000 + 1 ))
@@ -24,6 +26,35 @@ while true; do
 
   # Divergências de um inventário
   psql -q -c "SELECT p.sku, ii.qtd_sistema, ii.qtd_contada FROM varejo.inventario_itens ii JOIN varejo.produtos p ON p.id = ii.produto_id WHERE ii.inventario_id = $INV AND ii.qtd_contada <> ii.qtd_sistema;" > /dev/null
+
+  # ---- Base ampliada (16_base_ampliada.sql). Só roda se ela existir. ----
+  if [ "$AMPLIADA" = "1" ]; then
+    PROD=$(( RANDOM % 20000 + 1 ))
+    NOTA=$(( (RANDOM * 32768 + RANDOM) % 2200000 + 1 ))
+    VENDA=$(( (RANDOM * 32768 + RANDOM) % 1900000 + 1 ))
+    CHAVE=$(printf "35%042d" $NOTA)
+
+    # Kardex do SKU na loja (consulta do balcão)
+    psql -q -c "SELECT tipo, quantidade, documento, dt_movimento FROM varejo.movimentacoes_estoque WHERE loja_id = $LOJA AND produto_id = $PROD ORDER BY dt_movimento DESC LIMIT 50;" > /dev/null
+
+    # Notas da loja presas em contingência ou pendentes de autorização
+    psql -q -c "SELECT n.numero, n.dt_emissao, n.status FROM fiscal.notas n WHERE n.loja_id = $LOJA AND n.status IN ('CONTINGENCIA', 'PENDENTE') AND n.dt_emissao >= now() - interval '2 days';" > /dev/null
+
+    # Consulta de nota pela chave de acesso (SAC, troca)
+    psql -q -c "SELECT n.numero, n.status, n.valor_total FROM fiscal.notas n WHERE n.chave_acesso = '$CHAVE';" > /dev/null
+
+    # Itens da nota de uma venda (reimpressão de cupom)
+    psql -q -c "SELECT ni.item, p.sku, ni.quantidade, ni.valor_unitario FROM fiscal.notas_itens ni JOIN fiscal.notas n ON n.id = ni.nota_id JOIN varejo.produtos p ON p.id = ni.produto_id WHERE n.venda_id = $VENDA;" > /dev/null
+
+    # Fila de integração parada por loja (painel da central)
+    psql -q -c "SELECT e.loja_id, count(*), min(e.criado_em) FROM integracao.eventos e WHERE e.status = 'PENDENTE' GROUP BY e.loja_id ORDER BY 3;" > /dev/null
+
+    # Tempo de resposta da SEFAZ na última hora
+    psql -q -c "SELECT date_trunc('minute', s.dt_evento), round(avg(s.tempo_resposta_ms)) FROM fiscal.eventos_sefaz s WHERE s.dt_evento >= now() - interval '1 hour' GROUP BY 1 ORDER BY 1;" > /dev/null
+
+    # Pedidos de compra atrasados do CD
+    psql -q -c "SELECT pc.id, f.razao_social, pc.dt_prevista FROM varejo.pedidos_compra pc JOIN varejo.fornecedores f ON f.id = pc.fornecedor_id WHERE pc.status IN ('ABERTO', 'PARCIAL') AND pc.dt_prevista < current_date AND pc.cd_id = $(( RANDOM % 3 + 1 ));" > /dev/null
+  fi
 
   sleep 10
 done

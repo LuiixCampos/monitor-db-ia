@@ -1,0 +1,320 @@
+{
+  "name": "Testar correções em HML",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "76942556-7618-4d97-97fb-b80effc0834f",
+      "name": "Executar manualmente",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "2c88d1a3-e68c-45d5-8996-5725ae0bd10d",
+      "name": "A cada 5 minutos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jiraVersion": "cloud",
+        "resource": "issue",
+        "operation": "getAll",
+        "returnAll": true,
+        "options": {
+          "jql": "labels = monitor-db-ia AND labels = aprovado AND labels not in (liberado-prd, revisar, corrigido) AND statusCategory != Done",
+          "fields": "labels,status"
+        }
+      },
+      "id": "ec69c117-2f62-459f-a466-3c806ffe6df3",
+      "name": "Chamados aprovados",
+      "type": "n8n-nodes-base.jira",
+      "typeVersion": 1,
+      "position": [
+        260,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://executor:8000/testar",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ jira_key: $json.key }) }}",
+        "options": {
+          "timeout": 900000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 0
+            }
+          }
+        }
+      },
+      "id": "d08407a7-1bf1-4b55-b896-6bdb44a656f1",
+      "name": "Testar em HML",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jiraVersion": "cloud",
+        "resource": "issueComment",
+        "operation": "add",
+        "issueKey": "={{ $json.jira_key }}",
+        "comment": "={{ ($json.liberado ? 'Teste em HML: LIBERADO para PRD.' : 'Teste em HML: NÃO liberado para PRD.') + '\\n\\n' + 'Banco: ' + ($json.banco || '-') + '\\n' + 'Resultado: ' + $json.mensagem + ($json.comandos && $json.comandos.length ? '\\n\\nComandos executados em HML:\\n' + $json.comandos.join('\\n') : '') + ($json.liberado ? '\\n\\nPara aplicar em PRD, adicione a etiqueta aplicar-prd (mudança aprovada).' : '') }}",
+        "options": {}
+      },
+      "id": "a9211eda-b285-4ec0-92e1-33a0dbc4b3b6",
+      "name": "Comentar no Jira",
+      "type": "n8n-nodes-base.jira",
+      "typeVersion": 1,
+      "position": [
+        780,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5927632e-6bb2-4c67-af9c-eb8729174858",
+              "leftValue": "={{ $('Testar em HML').item.json.liberado }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "8693d78c-bb94-4876-8b2d-d6f289958113",
+      "name": "Liberado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1040,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jiraVersion": "cloud",
+        "resource": "issue",
+        "operation": "update",
+        "issueKey": "={{ $('Testar em HML').item.json.jira_key }}",
+        "updateFields": {
+          "labels": "={{ $('Chamados aprovados').item.json.fields.labels.concat(['liberado-prd']) }}"
+        }
+      },
+      "id": "9d709c5a-7c38-4900-9967-9570ef2fe440",
+      "name": "Marcar liberado-prd",
+      "type": "n8n-nodes-base.jira",
+      "typeVersion": 1,
+      "position": [
+        1300,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#incidentes-db",
+          "mode": "name"
+        },
+        "text": "={{ ':test_tube: *' + $('Testar em HML').item.json.jira_key + '* testado em HML e liberado para PRD\\n' + $('Testar em HML').item.json.mensagem + '\\n_Para aplicar, adicione a etiqueta `aplicar-prd` no Jira._' }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "mrkdwn": true
+        }
+      },
+      "id": "a576a88c-a998-4d04-923b-92c158328cb4",
+      "name": "Avisar no Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        1560,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jiraVersion": "cloud",
+        "resource": "issue",
+        "operation": "update",
+        "issueKey": "={{ $('Chamados aprovados').item.json.key }}",
+        "updateFields": {
+          "labels": "={{ $('Chamados aprovados').item.json.fields.labels.concat(['revisar']) }}"
+        }
+      },
+      "id": "cc9afc87-91fd-4d7b-9212-5a8523226a4c",
+      "name": "Marcar para revisão",
+      "type": "n8n-nodes-base.jira",
+      "typeVersion": 1,
+      "position": [
+        1300,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#incidentes-db",
+          "mode": "name"
+        },
+        "text": "={{ ':warning: *' + $('Testar em HML').item.json.jira_key + '* NÃO liberado em HML\\n' + $('Testar em HML').item.json.mensagem }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "mrkdwn": true
+        }
+      },
+      "id": "d6da1c73-3a58-402f-9175-52011c052727",
+      "name": "Avisar reprovação no Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        1560,
+        220
+      ]
+    }
+  ],
+  "connections": {
+    "Executar manualmente": {
+      "main": [
+        [
+          {
+            "node": "Chamados aprovados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "A cada 5 minutos": {
+      "main": [
+        [
+          {
+            "node": "Chamados aprovados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chamados aprovados": {
+      "main": [
+        [
+          {
+            "node": "Testar em HML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Testar em HML": {
+      "main": [
+        [
+          {
+            "node": "Comentar no Jira",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comentar no Jira": {
+      "main": [
+        [
+          {
+            "node": "Liberado?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Liberado?": {
+      "main": [
+        [
+          {
+            "node": "Marcar liberado-prd",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Marcar para revisão",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar liberado-prd": {
+      "main": [
+        [
+          {
+            "node": "Avisar no Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar para revisão": {
+      "main": [
+        [
+          {
+            "node": "Avisar reprovação no Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}
